@@ -202,3 +202,20 @@ input, select {
     opacity: 0;
   }
 }
+
+/* The following parts are added for the animated footer */
+
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Start hidden (moved down by 100% of its height) */
+  transform: translateY(100%);
+  transition: transform 0.5s ease-in-out;
+}
+
+/* When the footer is visible, reset the transform */
+.footer.visible {
+  transform: translateY(0);
+}
