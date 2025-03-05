@@ -477,12 +477,10 @@ function timeDifference (startTime, endTime) {
 
 let hideTimeout = null;
 const footer = document.querySelector('.footer');
-
-// For touch swipe detection
+const swipeThreshold = 50; // Minimum pixels for swipe-up detection
 let touchStartY = null;
-const swipeThreshold = 50; // minimum pixels to count as a swipe up
 
-// Show the footer immediately and clear any pending hide timer
+// Show the footer immediately and cancel any pending hide timer.
 function showFooter() {
   if (hideTimeout) {
     clearTimeout(hideTimeout);
@@ -491,17 +489,18 @@ function showFooter() {
   footer.classList.add('visible');
 }
 
-// Schedule to hide the footer after 5 seconds if no further interaction occurs
+// Schedule the footer to hide after 5 seconds of inactivity.
 function scheduleHideFooter() {
-  if (!hideTimeout) {
-    hideTimeout = setTimeout(() => {
-      footer.classList.remove('visible');
-      hideTimeout = null;
-    }, 5000);
+  if (hideTimeout) {
+    clearTimeout(hideTimeout);
   }
+  hideTimeout = setTimeout(() => {
+    footer.classList.remove('visible');
+    hideTimeout = null;
+  }, 5000);
 }
 
-// Mouse event: Show footer if hovering in the bottom 10%, else schedule hide
+// Mouse events: Show footer if hovering near the bottom; otherwise, schedule a hide.
 window.addEventListener('mousemove', (e) => {
   const bottomThreshold = window.innerHeight * 0.9;
   if (e.clientY >= bottomThreshold) {
@@ -511,41 +510,58 @@ window.addEventListener('mousemove', (e) => {
   }
 });
 
-// Also hide the footer if the mouse leaves the window entirely
+// Also hide the footer if the mouse leaves the window.
 document.addEventListener('mouseout', (e) => {
   if (!e.relatedTarget) {
     scheduleHideFooter();
   }
 });
 
-// Touch events: detect a swipe up gesture from the bottom of the screen
+// Touch events: Detect a swipe-up gesture starting in the bottom 10% of the screen.
 document.addEventListener('touchstart', (e) => {
   if (e.touches.length === 1) {
     const touchY = e.touches[0].clientY;
     const bottomThreshold = window.innerHeight * 0.9;
-    // Only consider touches that start near the bottom 10%
     if (touchY >= bottomThreshold) {
       touchStartY = touchY;
     }
   }
-}, {passive: true});
+}, { passive: true });
 
 document.addEventListener('touchmove', (e) => {
   if (touchStartY !== null && e.touches.length === 1) {
     const touchY = e.touches[0].clientY;
-    const deltaY = touchStartY - touchY; // positive if swiping up
+    const deltaY = touchStartY - touchY; // Positive when swiping up
     if (deltaY > swipeThreshold) {
       showFooter();
-      touchStartY = null; // Reset to prevent repeated triggers
+      touchStartY = null; // Prevent repeated triggers during the same swipe
     }
   }
-}, {passive: true});
+}, { passive: true });
 
-document.addEventListener('touchend', (e) => {
-  // Clear the starting position
+document.addEventListener('touchend', () => {
   touchStartY = null;
-  // Schedule the footer to hide if visible
-  if (footer.classList.contains('visible')) {
+  scheduleHideFooter();
+});
+
+// For touchscreen: Reset the hide timer when there is interaction with footer inputs.
+const interactiveElements = document.querySelectorAll(
+  '.footer input, .footer select, .footer button, .footer textarea'
+);
+
+interactiveElements.forEach((elem) => {
+  // Touch interactions (for mobile)
+  elem.addEventListener('touchstart', () => {
     scheduleHideFooter();
-  }
+  }, { passive: true });
+
+  // Mouse click interactions
+  elem.addEventListener('click', () => {
+    scheduleHideFooter();
+  });
+
+  // Keyboard interactions (e.g., typing in a text field)
+  elem.addEventListener('keydown', () => {
+    scheduleHideFooter();
+  });
 });
