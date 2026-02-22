@@ -418,18 +418,31 @@ async function announceNextTrain() {
     announcementPlaying = false;
 }
 
+function getAnnouncementIntervalMs() {
+    let val = parseInt(document.getElementById("announcementIntervalEntry").value);
+    if (isNaN(val) || val < 30) val = 30;
+    if (val > 1200) val = 1200;
+    return val * 1000;
+}
+
 function toggleAnnouncement() {
     let checkbox = document.getElementById("toggleAnnouncement");
     if (checkbox.checked) {
         announcementEnabled = true;
         announceNextTrain();
-        announcementInterval = setInterval(announceNextTrain, 30000);
+        announcementInterval = setInterval(announceNextTrain, getAnnouncementIntervalMs());
     } else {
         announcementEnabled = false;
         clearInterval(announcementInterval);
         announcementInterval = null;
         announcementPlaying = false;
     }
+}
+
+function updateAnnouncementInterval() {
+    if (!announcementEnabled) return;
+    clearInterval(announcementInterval);
+    announcementInterval = setInterval(announceNextTrain, getAnnouncementIntervalMs());
 }
 
 var routeSelect = document.getElementById("routeSelect");

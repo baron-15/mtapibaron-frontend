@@ -76,6 +76,9 @@
                     <span>
                         <label for="toggleAnnouncement">Voice Announcement:</label>
                         <input type="checkbox" id="toggleAnnouncement" onchange="toggleAnnouncement()">
+                        <label for="announcementInterval">every</label>
+                        <input type="number" id="announcementIntervalEntry" value="300" min="30" max="1200" step="1" style="width: 50px;" onchange="updateAnnouncementInterval()">
+                        <label>s</label>
                     </span>
                 </div>
 
