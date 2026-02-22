@@ -10,6 +10,9 @@ var lastFetchTime = null;
 var currentStationStops = [];
 var announcementEnabled = false;
 var announcementInterval = null;
+var stationMap = {};
+var announcementPlaying = false;
+var audioDir = 'audio1';
 var routeBackgroundColors = {
     A: '#0039a6',
     C: '#0039a6',
@@ -344,37 +347,75 @@ function toOrdinal(n) {
 function pronounceStationName(name) {
     return name.replace(/(\d+)\s*St\b/g, (m, num) => toOrdinal(num) + ' Street')
                .replace(/(\d+)\s*Av\b/g, (m, num) => toOrdinal(num) + ' Avenue')
-               .replace(/-/g, '. ');
+               .replace(/-/g, ',. ');
 }
 
-function announceNextTrain() {
-    if (!announcementEnabled || lastTrainData.length === 0) return;
+function playClip(src) {
+    return new Promise((resolve, reject) => {
+        let audio = new Audio(src);
+        audio.onended = resolve;
+        audio.onerror = reject;
+        audio.play().catch(reject);
+    });
+}
+
+async function playClipSequence(clips, gap) {
+    gap = gap || 0;
+    for (let i = 0; i < clips.length; i++) {
+        await playClip(clips[i]);
+        if (i < clips.length - 1) {
+            await new Promise(r => setTimeout(r, gap));
+        }
+    }
+}
+
+function getStationFilename(terminalName) {
+    if (stationMap[terminalName]) return stationMap[terminalName];
+    return terminalName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().replace(/^_|_$/g, '');
+}
+
+async function announceNextTrain() {
+    if (!announcementEnabled || lastTrainData.length === 0 || announcementPlaying) return;
 
     let filteredTrains = lastTrainData.filter(train => !hiddenRoutes.has(train.route.charAt(0)) && !currentStationStops.includes(train.terminal.slice(0, -1)));
     if (filteredTrains.length === 0) return;
 
     let train = filteredTrains[0];
-    let article = /^[AEIOU]/i.test(train.directionLabel) ? 'Ann' : 'Aa';
     let currentDate = lastFetchTime || new Date();
     let eta = new Date(train.time);
     let minuteDifference = Math.round((eta.getTime() - currentDate.getTime()) / 60000);
-    let suffix = minuteDifference <= 0
-        ? 'approaching the station. Please stand away from the platform edge.'
-        : `${minuteDifference} ${minuteDifference === 1 ? 'minute' : 'minutes'} away.`;
+
+    let clips = [];
+    clips.push(audioDir + '/phrases/there_is.mp3');
+    clips.push(/^[AEIOU]/i.test(train.directionLabel) ? audioDir + '/phrases/an.mp3' : audioDir + '/phrases/a.mp3');
+
     let boundDirections = ['Brooklyn', 'Bronx', 'Queens'];
     let noBoundDirections = ['Uptown', 'Downtown'];
-    let directionPart = boundDirections.includes(train.directionLabel) ? `${train.directionLabel}-bound.. `
-        : noBoundDirections.includes(train.directionLabel) ? `${train.directionLabel}.. `
-        : '';
-    let message = `There is.. ${article} .. ${directionPart},, ${train.service},, ${train.route.charAt(0)},, train., to. ${pronounceStationName(train.terminalName)}.. ${suffix}`;
+    if (boundDirections.includes(train.directionLabel)) {
+        clips.push(audioDir + '/directions/' + train.directionLabel.toLowerCase() + '_bound.mp3');
+    } else if (noBoundDirections.includes(train.directionLabel)) {
+        clips.push(audioDir + '/directions/' + train.directionLabel.toLowerCase() + '.mp3');
+    }
 
-    let utterance = new SpeechSynthesisUtterance(message);
-    let voices = speechSynthesis.getVoices();
-    let preferred = voices.find(v => v.name.includes('Google') || v.name.includes('Microsoft'));
-    if (preferred) utterance.voice = preferred;
-    utterance.rate = 1;
-    utterance.pitch = 1.1;
-    speechSynthesis.speak(utterance);
+    clips.push(audioDir + '/services/' + train.service.toLowerCase() + '.mp3');
+    clips.push(audioDir + '/routes/' + train.route.charAt(0) + '.mp3');
+    clips.push(audioDir + '/phrases/train_to.mp3');
+    clips.push(audioDir + '/stations/' + getStationFilename(train.terminalName) + '.mp3');
+
+    if (minuteDifference <= 0) {
+        clips.push(audioDir + '/phrases/approaching.mp3');
+    } else {
+        let min = Math.min(Math.max(minuteDifference, 1), 99);
+        clips.push(audioDir + '/minutes/' + min + '.mp3');
+    }
+
+    announcementPlaying = true;
+    try {
+        await playClipSequence(clips, 0);
+    } catch (e) {
+        console.log('Announcement clip error:', e);
+    }
+    announcementPlaying = false;
 }
 
 function toggleAnnouncement() {
@@ -382,12 +423,12 @@ function toggleAnnouncement() {
     if (checkbox.checked) {
         announcementEnabled = true;
         announceNextTrain();
-        announcementInterval = setInterval(announceNextTrain, 300000);
+        announcementInterval = setInterval(announceNextTrain, 30000);
     } else {
         announcementEnabled = false;
         clearInterval(announcementInterval);
         announcementInterval = null;
-        speechSynthesis.cancel();
+        announcementPlaying = false;
     }
 }
 
@@ -542,6 +583,8 @@ function loadURLandSetStationId() {
 }
 
 loadStationData().then(() => {
+    return fetch(audioDir + '/station_map.json').then(r => r.json()).then(map => { stationMap = map; });
+}).then(() => {
     init();
     getUserSettings();
     preselectStation(stationId);
