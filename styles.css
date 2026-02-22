@@ -52,6 +52,10 @@ input, select {
   color: #ffffff;
 }
 
+#stopSelect {
+  width: 40vw;
+}
+
 
 
 #stationName {
@@ -67,6 +71,14 @@ input, select {
   font-size: 3.5vw;
   font-weight: normal;
   padding-top: 0.75vh;
+}
+
+#allRoutes .route {
+  cursor: pointer;
+}
+
+#allRoutes .route.dimmed {
+  opacity: 0.4;
 }
 
 #allRoutes {

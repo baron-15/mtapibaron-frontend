@@ -41,16 +41,20 @@
             </div>
             <div class = "footer">
                 <div class = "forms">
-                    <form action="" id="stopIdForm">
-                        <span>
-                            Use <b>parent_id</b> in 
-                            <a href = "https://github.com/baron-15/mtapibaron-frontend/blob/main/stations.csv"  target="_blank" rel="noopener noreferrer"> this csv</a>.
-                        </span>
-                        <b> Enter your station's stop ID: </b>
-                            <input type="text" id="stopIdEntry"  maxlength="3" size="9" placeholder="127, 228..." >
-                            <!-- <button type="submit">Submit</button> -->
-                            
-                    </form>
+                    <span>
+                        <label>Route:</label>
+                        <select id="routeSelect">
+                            <option value="">-- Select --</option>
+                        </select>
+                    </span>
+                    <span>
+                        <label>Stop:</label>
+                        <select id="stopSelect" disabled>
+                            <option value="">-- Select --</option>
+                        </select>
+                    </span>
+                </div>
+                <div class = "forms">
                     <span>
                         <label for="selectedNumber">Select the number of trains in display:</label>
                             <select id="noOfTrainsEntry" onchange="runJobOnce()">
@@ -68,6 +72,10 @@
                     <span>
                         <label for="toggleStationBlock">Display Station Block:</label>
                         <input type="checkbox" id="toggleStationBlock" onchange="toggleStationBlock()" checked>
+                    </span>
+                    <span>
+                        <label for="toggleAnnouncement">Voice Announcement:</label>
+                        <input type="checkbox" id="toggleAnnouncement" onchange="toggleAnnouncement()">
                     </span>
                 </div>
 

@@ -3,6 +3,13 @@ var previousStationId = '640';
 var errorCount = 0;
 var selectedNumber = 2;
 var displayStationBlock = 0;
+var stationData = [];
+var hiddenRoutes = new Set();
+var lastTrainData = [];
+var lastFetchTime = null;
+var currentStationStops = [];
+var announcementEnabled = false;
+var announcementInterval = null;
 var routeBackgroundColors = {
     A: '#0039a6',
     C: '#0039a6',
@@ -51,68 +58,10 @@ async function loadSomeDisplay (stationId) {
         let currentDate = new Date();
         let options = { timeZone: 'America/New_York' };
         let currentDateTimeET = currentDate.toLocaleString('en-US', options);
-        selectedNumber = parseInt(document.getElementById("noOfTrainsEntry").value);
-        let noOfTrains = Object.keys(responseJson.data[0].alltrains).length;
-        document.getElementById("trainBlock").innerHTML = "";
-        for (let k = 1; k <= selectedNumber; k++) {
-            let trainrowDiv = document.createElement("div");
-            trainrowDiv.className = "trainrow";
-            trainrowDiv.id = "trainrow" + k;
-
-            let numDiv = document.createElement("div");
-            numDiv.className = "num";
-            numDiv.id = "num" + k;
-            numDiv.innerHTML = k +".";
-
-            let routeDiv = document.createElement("div");
-            routeDiv.className = "route";
-            routeDiv.id = "route" + k;
-
-            let routeTextDiv = document.createElement("div");
-            routeTextDiv.className = "routeText";
-            routeTextDiv.id = "routeText" + k;
-
-            routeDiv.appendChild(routeTextDiv);
-
-            let terminalDiv = document.createElement("div");
-            terminalDiv.className = "terminal";
-            terminalDiv.id = "terminal" + k;
-
-            let etaDiv = document.createElement("div");
-            etaDiv.className = "eta";
-            etaDiv.id = "eta" + k;
-
-            trainrowDiv.appendChild(numDiv);
-            trainrowDiv.appendChild(routeDiv);
-            trainrowDiv.appendChild(terminalDiv);
-            trainrowDiv.appendChild(etaDiv);
-            document.getElementById("trainBlock").appendChild(trainrowDiv);
-
-            if (noOfTrains >= k) {
-                routeTextDiv.innerHTML = responseJson.data[0].alltrains[k - 1].route.charAt(0);
-                terminalDiv.innerHTML = responseJson.data[0].alltrains[k - 1].terminalName;
-                let etaString = responseJson.data[0].alltrains[k - 1].time;
-                let eta = new Date(etaString);
-                etaDiv.innerHTML = timeDifference(currentDate, eta);
-                etaDiv.innerHTML += ' min';
-                if (responseJson.data[0].alltrains[k-1].route.slice(-1) == "X")
-                {
-                    routeDiv.classList.remove('circle');
-                    routeDiv.classList.add('diamond');
-                }
-                else
-                {
-                    routeDiv.classList.remove('diamond');
-                    routeDiv.classList.add('circle');
-                }
-            }
-
-            else {
-                    routeTextDiv.innerHTML = "";
-                    terminalDiv.innerHTML = "No scheduled";
-                    etaDiv.innerHTML = "";
-                }
-        }
+        lastTrainData = responseJson.data[0].alltrains;
+        currentStationStops = Object.keys(responseJson.data[0].stops);
+        lastFetchTime = currentDate;
+        renderTrainRows();
         /*
         const mtaRouteText0 = document.getElementById('routeText0');
         const mtaTerminal0 = document.getElementById('terminal0');
@@ -171,10 +120,9 @@ async function loadSomeDisplay (stationId) {
         */
         previousStationId = stationId;
         saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
-        userEntry.value = "";
         document.querySelector('#datetime').textContent = 'ID: ' + stationId  + ' ... MTA API Data: ' + responseJson.updated + ' ... Browser Refresh Time: ' + currentDateTimeET + ' ET';
         
-        const rawStationName = responseJson.data[0].name;
+        const rawStationName = responseJson.data[0].stationName;
         const stationNameArr = rawStationName.split("|");
         document.querySelector('#stationName').textContent = stationNameArr[0] + ' Station';
         for (let i = 1; i < stationNameArr.length; i++) {
@@ -216,7 +164,77 @@ async function loadSomeDisplay (stationId) {
                 }
             document.getElementById("allRoutes").appendChild(routeBlock);
         }
+
+        document.querySelectorAll('#allRoutes .route').forEach(block => {
+            block.addEventListener('click', () => {
+                const letter = block.querySelector('.routeText').innerText.charAt(0);
+                toggleRouteFilter(letter);
+            });
+        });
+        applyRouteFilter();
     })
+}
+
+function renderTrainRows() {
+    selectedNumber = parseInt(document.getElementById("noOfTrainsEntry").value);
+    let filteredTrains = lastTrainData.filter(train => !hiddenRoutes.has(train.route.charAt(0)) && !currentStationStops.includes(train.terminal.slice(0, -1)));
+    let currentDate = lastFetchTime || new Date();
+
+    document.getElementById("trainBlock").innerHTML = "";
+    for (let k = 1; k <= selectedNumber; k++) {
+        let trainrowDiv = document.createElement("div");
+        trainrowDiv.className = "trainrow";
+        trainrowDiv.id = "trainrow" + k;
+
+        let numDiv = document.createElement("div");
+        numDiv.className = "num";
+        numDiv.id = "num" + k;
+        numDiv.innerHTML = k + ".";
+
+        let routeDiv = document.createElement("div");
+        routeDiv.className = "route";
+        routeDiv.id = "route" + k;
+
+        let routeTextDiv = document.createElement("div");
+        routeTextDiv.className = "routeText";
+        routeTextDiv.id = "routeText" + k;
+
+        routeDiv.appendChild(routeTextDiv);
+
+        let terminalDiv = document.createElement("div");
+        terminalDiv.className = "terminal";
+        terminalDiv.id = "terminal" + k;
+
+        let etaDiv = document.createElement("div");
+        etaDiv.className = "eta";
+        etaDiv.id = "eta" + k;
+
+        trainrowDiv.appendChild(numDiv);
+        trainrowDiv.appendChild(routeDiv);
+        trainrowDiv.appendChild(terminalDiv);
+        trainrowDiv.appendChild(etaDiv);
+        document.getElementById("trainBlock").appendChild(trainrowDiv);
+
+        if (filteredTrains.length >= k) {
+            routeTextDiv.innerHTML = filteredTrains[k - 1].route.charAt(0);
+            terminalDiv.innerHTML = filteredTrains[k - 1].terminalName;
+            let etaString = filteredTrains[k - 1].time;
+            let eta = new Date(etaString);
+            etaDiv.innerHTML = timeDifference(currentDate, eta);
+            etaDiv.innerHTML += ' min';
+            if (filteredTrains[k - 1].route.slice(-1) == "X") {
+                routeDiv.classList.remove('circle');
+                routeDiv.classList.add('diamond');
+            } else {
+                routeDiv.classList.remove('diamond');
+                routeDiv.classList.add('circle');
+            }
+        } else {
+            routeTextDiv.innerHTML = "";
+            terminalDiv.innerHTML = "No scheduled";
+            etaDiv.innerHTML = "";
+        }
+    }
 }
 
 function runJobOnce() {
@@ -229,19 +247,11 @@ function runJobOnce() {
         console.log("Too many errors. Abort. Delaying for 15s.");
         setTimeout(() => {
             console.log("Resetting to station 640.");
-            stationId = 640;
-            previousStationId = 640;
-            userEntry.value = "";
+            stationId = '640';
+            previousStationId = '640';
+            preselectStation(stationId);
         }, 15000);
         throw new Error("Something went wrong repeatedly.");
-    }
-    let userEntry = document.getElementById("stopIdEntry");
-
-    // added the stationId != previousId as hover away and submit enter may trigger two actions
-    // which may cause invalid display to be incorrect
-    if ((userEntry) && (stationId != previousStationId)) { 
-        userEntry.placeholder = `${stationId} invalid`;
-        userEntry.value = "";
     }
     stationId = previousStationId;
     runJobOnce();
@@ -295,29 +305,175 @@ function routeUpdate () {
     errorCount = 0;
 }
 
-var stopForm = document.getElementById("stopIdForm");
-var userEntry = document.getElementById("stopIdEntry");
-stopForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    processStopIdEntry(e)
-});
-
-userEntry.addEventListener("change", (e) => {
-    e.preventDefault();
-    processStopIdEntry(e)
-});
-
-function processStopIdEntry(e) {
-    if (userEntry.value == '') {
-        return false;
+function toggleRouteFilter(routeLetter) {
+    if (hiddenRoutes.has(routeLetter)) {
+        hiddenRoutes.delete(routeLetter);
+    } else {
+        hiddenRoutes.add(routeLetter);
     }
-    else {
-        console.log("User entry: ", userEntry.value);
-        stationId = userEntry.value.toUpperCase();
-        runJobOnce();
-        saveUserSettings(stationId, previousStationId, selectedNumber);
-        userEntry.placeholder = `640, 127, 228, 631...`;
+    applyRouteFilter();
+}
+
+function applyRouteFilter() {
+    document.querySelectorAll('#allRoutes .route').forEach(block => {
+        const letter = block.querySelector('.routeText').innerText.charAt(0);
+        if (hiddenRoutes.has(letter)) {
+            block.classList.add('dimmed');
+        } else {
+            block.classList.remove('dimmed');
+        }
+    });
+
+    renderTrainRows();
+    arrivalUpdate();
+    routeUpdate();
+}
+
+function toOrdinal(n) {
+    let num = parseInt(n);
+    let lastTwo = num % 100;
+    if (lastTwo >= 11 && lastTwo <= 13) return n + 'th';
+    switch (num % 10) {
+        case 1: return n + 'st';
+        case 2: return n + 'nd';
+        case 3: return n + 'rd';
+        default: return n + 'th';
     }
+}
+
+function pronounceStationName(name) {
+    return name.replace(/(\d+)\s*St\b/g, (m, num) => toOrdinal(num) + ' Street')
+               .replace(/(\d+)\s*Av\b/g, (m, num) => toOrdinal(num) + ' Avenue')
+               .replace(/-/g, '. ');
+}
+
+function announceNextTrain() {
+    if (!announcementEnabled || lastTrainData.length === 0) return;
+
+    let filteredTrains = lastTrainData.filter(train => !hiddenRoutes.has(train.route.charAt(0)) && !currentStationStops.includes(train.terminal.slice(0, -1)));
+    if (filteredTrains.length === 0) return;
+
+    let train = filteredTrains[0];
+    let article = /^[AEIOU]/i.test(train.directionLabel) ? 'Ann' : 'Aa';
+    let currentDate = lastFetchTime || new Date();
+    let eta = new Date(train.time);
+    let minuteDifference = Math.round((eta.getTime() - currentDate.getTime()) / 60000);
+    let suffix = minuteDifference <= 0
+        ? 'approaching the station. Please stand away from the platform edge.'
+        : `${minuteDifference} ${minuteDifference === 1 ? 'minute' : 'minutes'} away.`;
+    let boundDirections = ['Brooklyn', 'Bronx', 'Queens'];
+    let noBoundDirections = ['Uptown', 'Downtown'];
+    let directionPart = boundDirections.includes(train.directionLabel) ? `${train.directionLabel}-bound.. `
+        : noBoundDirections.includes(train.directionLabel) ? `${train.directionLabel}.. `
+        : '';
+    let message = `There is.. ${article} .. ${directionPart},, ${train.service},, ${train.route.charAt(0)},, train., to. ${pronounceStationName(train.terminalName)}.. ${suffix}`;
+
+    let utterance = new SpeechSynthesisUtterance(message);
+    let voices = speechSynthesis.getVoices();
+    let preferred = voices.find(v => v.name.includes('Google') || v.name.includes('Microsoft'));
+    if (preferred) utterance.voice = preferred;
+    utterance.rate = 1;
+    utterance.pitch = 1.1;
+    speechSynthesis.speak(utterance);
+}
+
+function toggleAnnouncement() {
+    let checkbox = document.getElementById("toggleAnnouncement");
+    if (checkbox.checked) {
+        announcementEnabled = true;
+        announceNextTrain();
+        announcementInterval = setInterval(announceNextTrain, 300000);
+    } else {
+        announcementEnabled = false;
+        clearInterval(announcementInterval);
+        announcementInterval = null;
+        speechSynthesis.cancel();
+    }
+}
+
+var routeSelect = document.getElementById("routeSelect");
+var stopSelect = document.getElementById("stopSelect");
+
+routeSelect.addEventListener("change", onRouteChange);
+stopSelect.addEventListener("change", onStopChange);
+
+async function loadStationData() {
+    const response = await fetch('MTA_Subway_Stations.csv');
+    const text = await response.text();
+    const lines = text.trim().split('\n');
+    for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',');
+        const gtfsStopId = cols[0].trim();
+        const stopName = cols[5].trim();
+        const daytimeRoutes = cols[8].trim().split(' ');
+        stationData.push({ gtfsStopId, stopName, routes: daytimeRoutes });
+    }
+    populateRouteDropdown();
+}
+
+function populateRouteDropdown() {
+    const allRoutes = new Set();
+    stationData.forEach(s => s.routes.forEach(r => allRoutes.add(r)));
+
+    const sorted = Array.from(allRoutes).sort((a, b) => {
+        const aIsNum = /^\d$/.test(a);
+        const bIsNum = /^\d$/.test(b);
+        if (aIsNum && bIsNum) return a.localeCompare(b);
+        if (aIsNum) return -1;
+        if (bIsNum) return 1;
+        if (a === 'SIR') return 1;
+        if (b === 'SIR') return -1;
+        return a.localeCompare(b);
+    });
+
+    sorted.forEach(route => {
+        const option = document.createElement('option');
+        option.value = route;
+        option.textContent = route;
+        routeSelect.appendChild(option);
+    });
+}
+
+function onRouteChange() {
+    const selectedRoute = routeSelect.value;
+    stopSelect.innerHTML = '<option value="">-- Select --</option>';
+
+    if (!selectedRoute) {
+        stopSelect.disabled = true;
+        return;
+    }
+
+    const matchingStations = stationData
+        .filter(s => s.routes.includes(selectedRoute))
+        .sort((a, b) => a.stopName.localeCompare(b.stopName));
+
+    matchingStations.forEach(station => {
+        const option = document.createElement('option');
+        option.value = station.gtfsStopId;
+        option.textContent = station.stopName;
+        stopSelect.appendChild(option);
+    });
+
+    stopSelect.disabled = false;
+}
+
+function onStopChange() {
+    const selectedStopId = stopSelect.value;
+    if (!selectedStopId) return;
+
+    hiddenRoutes.clear();
+    stationId = selectedStopId;
+    runJobOnce();
+    saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
+}
+
+function preselectStation(targetStopId) {
+    const station = stationData.find(s => s.gtfsStopId === targetStopId);
+    if (!station) return;
+
+    routeSelect.value = station.routes[0];
+    onRouteChange();
+    stopSelect.value = targetStopId;
 }
 
 function saveUserSettings(cS, pS, sN, sB) {
@@ -385,7 +541,12 @@ function loadURLandSetStationId() {
     */
 }
 
-init().then(result => getUserSettings()).then(result2 => runJob());
+loadStationData().then(() => {
+    init();
+    getUserSettings();
+    preselectStation(stationId);
+    runJob();
+});
 
 // To mock the order of route display based on Times Square (ACENQRWS1237) and Grand Central (4567S) to blend S in middle
 // I had to write two separate sort functions to run based on if a letter other S exists
