@@ -411,7 +411,8 @@ async function announceNextTrain() {
 
     let alwaysLocalRoutes = ['S', 'SI', 'H', 'L', 'G'];
     if (!alwaysLocalRoutes.includes(train.route.charAt(0))) {
-        clips.push(audioDir + '/services/' + train.service.toLowerCase() + '.mp3');
+        let serviceFile = train.service.toLowerCase() === 'expressdiamond' ? 'express' : train.service.toLowerCase();
+        clips.push(audioDir + '/services/' + serviceFile + '.mp3');
     }
     clips.push(audioDir + '/routes/' + train.route.charAt(0) + '.mp3');
     clips.push(audioDir + '/phrases/train_to.mp3');
