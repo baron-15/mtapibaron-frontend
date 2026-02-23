@@ -22,10 +22,10 @@ from google.cloud import texttospeech
 if len(sys.argv) > 1:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = sys.argv[1]
 
-OUTPUT_DIR = "audio1"
-VOICE_NAME = "en-US-Neural2-J"
-SPEAKING_RATE = 1.1
-PITCH = 1.0
+OUTPUT_DIR = "audio3"
+VOICE_NAME = "en-US-News-N"
+SPEAKING_RATE = 1.0
+PITCH = 0.0
 
 # ── Clip definitions ──
 
@@ -525,8 +525,7 @@ def generate_clip(client, text, filepath):
         print(f"  SKIP (exists): {filepath}")
         return
 
-    ssml = f'<speak><google:style name="firm">{text}</google:style></speak>'
-    synthesis_input = texttospeech.SynthesisInput(ssml=ssml)
+    synthesis_input = texttospeech.SynthesisInput(text=text)
     voice = texttospeech.VoiceSelectionParams(
         language_code="en-US",
         name=VOICE_NAME,

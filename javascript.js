@@ -292,7 +292,7 @@ function routeUpdate () {
     let routeElements = document.querySelectorAll('.route');
     routeElements.forEach(function(routeElement) {
     let routeValue = routeElement.innerText.charAt(0); 
-    let routeBackgroundColor = routeBackgroundColors[routeValue];
+    let routeBackgroundColor = routeBackgroundColors[routeValue] || '#808183';
     if (!routeValue) {
         routeBackgroundColor = '#000000';
     } 
@@ -350,21 +350,33 @@ function pronounceStationName(name) {
                .replace(/-/g, ',. ');
 }
 
-function playClip(src) {
-    return new Promise((resolve, reject) => {
+function getAudioDuration(src) {
+    return new Promise((resolve) => {
         let audio = new Audio(src);
-        audio.onended = resolve;
-        audio.onerror = reject;
-        audio.play().catch(reject);
+        audio.addEventListener('loadedmetadata', () => resolve(audio.duration));
+        audio.addEventListener('error', () => resolve(0));
     });
 }
 
 async function playClipSequence(clips, gap) {
     gap = gap || 0;
     for (let i = 0; i < clips.length; i++) {
-        await playClip(clips[i]);
-        if (i < clips.length - 1) {
-            await new Promise(r => setTimeout(r, gap));
+        let audio = new Audio(clips[i]);
+        let playPromise = new Promise((resolve, reject) => {
+            audio.onended = resolve;
+            audio.onerror = reject;
+        });
+        audio.play().catch(e => console.log('Clip play error:', e));
+
+        if (gap < 0 && i < clips.length - 1) {
+            let duration = await getAudioDuration(clips[i]);
+            let overlapStart = Math.max((duration * 1000) + gap, 100);
+            await new Promise(r => setTimeout(r, overlapStart));
+        } else {
+            await playPromise;
+            if (gap > 0 && i < clips.length - 1) {
+                await new Promise(r => setTimeout(r, gap));
+            }
         }
     }
 }
@@ -397,7 +409,10 @@ async function announceNextTrain() {
         clips.push(audioDir + '/directions/' + train.directionLabel.toLowerCase() + '.mp3');
     }
 
-    clips.push(audioDir + '/services/' + train.service.toLowerCase() + '.mp3');
+    let alwaysLocalRoutes = ['S', 'SI', 'H', 'L', 'G'];
+    if (!alwaysLocalRoutes.includes(train.route.charAt(0))) {
+        clips.push(audioDir + '/services/' + train.service.toLowerCase() + '.mp3');
+    }
     clips.push(audioDir + '/routes/' + train.route.charAt(0) + '.mp3');
     clips.push(audioDir + '/phrases/train_to.mp3');
     clips.push(audioDir + '/stations/' + getStationFilename(train.terminalName) + '.mp3');
@@ -411,7 +426,7 @@ async function announceNextTrain() {
 
     announcementPlaying = true;
     try {
-        await playClipSequence(clips, 0);
+        await playClipSequence(clips, -100);
     } catch (e) {
         console.log('Announcement clip error:', e);
     }
