@@ -46,7 +46,7 @@ phrases = {
     "a": "a",
     "an": "an",
     "train_to": "train, to",
-    "approaching": "approaching the station. Please stand away from the platform edge.",
+    "approaching": "approaching the station. Please stand away from the platform edge!",
 }
 
 directions = {
