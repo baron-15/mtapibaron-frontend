@@ -174,6 +174,8 @@ for i in range(1, 100):
 def pronounce_station_name(name):
     """Convert station name to TTS-friendly pronunciation with full word numbers."""
     result = name
+    # Expand WTC abbreviation
+    result = result.replace('WTC', 'World Trade Center')
     # Expand directional prefixes first
     result = re.sub(r'\bW\b', 'West', result)
     result = re.sub(r'\bE\b', 'East', result)
