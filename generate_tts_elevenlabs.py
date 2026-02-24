@@ -166,7 +166,7 @@ minutes = {}
 for i in range(1, 100):
     num_words = number_to_words(i)
     word = "minute" if i == 1 else "minutes"
-    minutes[str(i)] = f"{num_words} {word} away."
+    minutes[str(i)] = f"{num_words} {word} away!"
 
 # ── Station names ──
 # We pronounce them with ordinals and expanded abbreviations
