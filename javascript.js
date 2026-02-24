@@ -12,7 +12,7 @@ var announcementEnabled = false;
 var announcementInterval = null;
 var stationMap = {};
 var announcementPlaying = false;
-var audioDir = 'audio1';
+var audioDir = 'audio7';
 var routeBackgroundColors = {
     A: '#0039a6',
     C: '#0039a6',
@@ -427,7 +427,7 @@ async function announceNextTrain() {
 
     announcementPlaying = true;
     try {
-        await playClipSequence(clips, -100);
+        await playClipSequence(clips, 0);
     } catch (e) {
         console.log('Announcement clip error:', e);
     }
