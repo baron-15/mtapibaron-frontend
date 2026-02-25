@@ -358,15 +358,49 @@ function getAudioDuration(src) {
     });
 }
 
+async function preloadClips(clips) {
+    // Preload all clips before playing for smoother first announcement
+    let preloadPromises = clips.map(clipUrl => {
+        return new Promise((resolve) => {
+            let audio = new Audio(clipUrl);
+            audio.preload = 'auto';
+            audio.oncanplaythrough = resolve;
+            audio.onerror = resolve; // Resolve even on error to not block
+            // Timeout after 2 seconds if clip doesn't load
+            setTimeout(resolve, 2000);
+        });
+    });
+    await Promise.all(preloadPromises);
+}
+
 async function playClipSequence(clips, gap) {
     gap = gap || 0;
+
+    // Preload all clips first for smoother playback
+    await preloadClips(clips);
+
     for (let i = 0; i < clips.length; i++) {
         let audio = new Audio(clips[i]);
-        let playPromise = new Promise((resolve, reject) => {
+
+        // Preload to improve smoothness
+        audio.preload = 'auto';
+
+        let playPromise = new Promise((resolve) => {
             audio.onended = resolve;
-            audio.onerror = reject;
+            audio.onerror = (e) => {
+                console.log('Audio error for', clips[i], ':', e);
+                // Don't reject - just resolve to continue to next clip
+                resolve();
+            };
         });
-        audio.play().catch(e => console.log('Clip play error:', e));
+
+        try {
+            await audio.play();
+        } catch (e) {
+            console.log('Play error for', clips[i], ':', e);
+            // Continue to next clip even if this one failed
+            continue;
+        }
 
         if (gap < 0 && i < clips.length - 1) {
             let duration = await getAudioDuration(clips[i]);
@@ -374,8 +408,9 @@ async function playClipSequence(clips, gap) {
             await new Promise(r => setTimeout(r, overlapStart));
         } else {
             await playPromise;
-            if (gap > 0 && i < clips.length - 1) {
-                await new Promise(r => setTimeout(r, gap));
+            // Add small delay between clips for smoother playback
+            if (i < clips.length - 1) {
+                await new Promise(r => setTimeout(r, gap > 0 ? gap : 50));
             }
         }
     }
@@ -488,6 +523,7 @@ async function announceNextTrain() {
 
     announcementPlaying = true;
     try {
+        // Preload all clips for smooth playback
         await playClipSequence(clips, 0);
     } catch (e) {
         console.log('Announcement clip error:', e);
@@ -506,6 +542,7 @@ function toggleAnnouncement() {
     let checkbox = document.getElementById("toggleAnnouncement");
     if (checkbox.checked) {
         announcementEnabled = true;
+        // All announcements preload for smooth playback
         announceNextTrain();
         announcementInterval = setInterval(announceNextTrain, getAnnouncementIntervalMs());
     } else {
