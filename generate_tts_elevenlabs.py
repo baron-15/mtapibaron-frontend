@@ -35,7 +35,7 @@ OUTPUT_DIR = "audio7"
 VOICE_SETTINGS = VoiceSettings(
     stability=0.35,
     similarity_boost=0.69,
-    style=0.5,
+    style=0.48,
     use_speaker_boost=True
 )
 
@@ -45,6 +45,7 @@ phrases = {
     "there_is": "There is",
     "a": "a",
     "an": "an",
+    "train": "train",
     "train_to": "train, to",
     "approaching": "approaching the station. Please stand away from the platform edge!",
 }
@@ -56,6 +57,7 @@ directions = {
     "bronx_bound": "Bronx-bound",
     "queens_bound": "Queens-bound",
     "manhattan_bound": "Manhattan-bound",
+    "_bound": "bound",
 }
 
 services = {
@@ -606,6 +608,15 @@ stations = {}
 for name in station_names_raw:
     key = sanitize_filename(name)
     stations[key] = pronounce_station_name(name)
+
+# Add station name parts for stations with dashes (for use with "_bound")
+for name in station_names_raw:
+    if '-' in name:
+        last_part = name.split('-')[-1].strip()
+        key = sanitize_filename(last_part)
+        # Only add if not already in stations (avoid duplicates)
+        if key not in stations:
+            stations[key] = pronounce_station_name(last_part)
 
 # ── Generate all clips ──
 

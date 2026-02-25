@@ -1,13 +1,13 @@
 {
     "name": "NYS DISPLAY",
     "short_name": "NYSD",
-    "id": "/index.html",
-    "start_url": "/index.html",
+    "id": "/mtapibaron-frontend/",
+    "start_url": "/mtapibaron-frontend/",
     "display": "standalone",
     "background_color": "#000000",
     "theme_color": "#000000",
     "description": "An app to display arrival information like you see at New York Subway platforms",
-    "scope": "/",
+    "scope": "/mtapibaron-frontend/",
     "icons": [
       {
         "src": "homeiconL.png",

@@ -399,24 +399,67 @@ async function announceNextTrain() {
 
     let clips = [];
     clips.push(audioDir + '/phrases/there_is.mp3');
-    clips.push(/^[AEIOU]/i.test(train.directionLabel) ? audioDir + '/phrases/an.mp3' : audioDir + '/phrases/a.mp3');
 
-    let boundDirections = ['Brooklyn', 'Bronx', 'Queens'];
+    // Determine the next word for a/an check
+    let alwaysLocalRoutes = ['S', 'SI', 'H', 'L', 'G'];
+    let nextWord = '';
+
+    // Check direction rules to determine what comes after a/an
     let noBoundDirections = ['Uptown', 'Downtown'];
-    if (boundDirections.includes(train.directionLabel)) {
-        clips.push(audioDir + '/directions/' + train.directionLabel.toLowerCase() + '_bound.mp3');
-    } else if (noBoundDirections.includes(train.directionLabel)) {
-        clips.push(audioDir + '/directions/' + train.directionLabel.toLowerCase() + '.mp3');
+    let boundDirections = ['Brooklyn', 'Bronx', 'Queens', 'Manhattan'];
+
+    // Direction is always announced first, so check what direction will be said
+    if (noBoundDirections.includes(train.directionLabel)) {
+        // Uptown or Downtown
+        nextWord = train.directionLabel;
+    } else if (boundDirections.includes(train.directionLabel)) {
+        // Brooklyn/Bronx/Queens/Manhattan bound
+        nextWord = train.directionLabel;
+    } else {
+        // Everything else uses terminalName_bound
+        let terminalForBound = train.terminalName;
+        if (train.terminalName.includes('-') && !train.terminalName.includes('Flushing')) {
+            terminalForBound = train.terminalName.split('-').pop().trim();
+        }
+        nextWord = terminalForBound;
     }
 
-    let alwaysLocalRoutes = ['S', 'SI', 'H', 'L', 'G'];
+    // Add a/an based on the actual next word
+    clips.push(/^[AEIOU]/i.test(nextWord) ? audioDir + '/phrases/an.mp3' : audioDir + '/phrases/a.mp3');
+
+    // Direction logic with new rules
+    let usedTerminalNameBound = false;
+    if (noBoundDirections.includes(train.directionLabel)) {
+        // Rule 1: Uptown/Downtown - keep as-is
+        clips.push(audioDir + '/directions/' + train.directionLabel.toLowerCase() + '.mp3');
+    } else if (boundDirections.includes(train.directionLabel)) {
+        // Rule 2: Brooklyn/Bronx/Queens/Manhattan - use direction_bound
+        clips.push(audioDir + '/directions/' + train.directionLabel.toLowerCase() + '_bound.mp3');
+    } else {
+        // Rule 3: Everything else - use terminalName_bound (last part if contains dash, except for Flushing)
+        let terminalForBound = train.terminalName;
+        if (train.terminalName.includes('-') && !train.terminalName.includes('Flushing')) {
+            terminalForBound = train.terminalName.split('-').pop().trim();
+        }
+        clips.push(audioDir + '/stations/' + getStationFilename(terminalForBound) + '.mp3');
+        clips.push(audioDir + '/directions/_bound.mp3');
+        usedTerminalNameBound = true;
+    }
+
+    // Service announcements
     if (!alwaysLocalRoutes.includes(train.route.charAt(0))) {
         let serviceFile = train.service.toLowerCase() === 'expressdiamond' ? 'express' : train.service.toLowerCase();
         clips.push(audioDir + '/services/' + serviceFile + '.mp3');
     }
     clips.push(audioDir + '/routes/' + train.route.charAt(0) + '.mp3');
-    clips.push(audioDir + '/phrases/train_to.mp3');
-    clips.push(audioDir + '/stations/' + getStationFilename(train.terminalName) + '.mp3');
+
+    // If we already said terminalName_bound, just say "train", otherwise say "train to terminalName"
+    if (usedTerminalNameBound) {
+        clips.push(audioDir + '/phrases/train.mp3');
+    } else {
+        clips.push(audioDir + '/phrases/train_to.mp3');
+        clips.push(audioDir + '/stations/' + getStationFilename(train.terminalName) + '.mp3');
+    }
 
     if (minuteDifference <= 0) {
         clips.push(audioDir + '/phrases/approaching.mp3');
