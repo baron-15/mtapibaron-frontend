@@ -618,6 +618,12 @@ for name in station_names_raw:
         if key not in stations:
             stations[key] = pronounce_station_name(last_part)
 
+# Add special exceptions for stations that use first part instead of last part
+# Coney Island: use "Coney Island" instead of "Stillwell Av" for "Coney Island-Stillwell Av"
+stations['coney_island'] = pronounce_station_name('Coney Island')
+# Van Cortlandt Park: use "Van Cortlandt Park" instead of "242 St" for "Van Cortlandt Park-242 St"
+stations['van_cortlandt_park'] = pronounce_station_name('Van Cortlandt Park')
+
 # ── Generate all clips ──
 
 def generate_clip(client, text, filepath):
