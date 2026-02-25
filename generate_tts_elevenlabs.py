@@ -57,7 +57,7 @@ directions = {
     "bronx_bound": "Bronx-bound",
     "queens_bound": "Queens-bound",
     "manhattan_bound": "Manhattan-bound",
-    "_bound": "bound",
+    "bound": "bound",
 }
 
 services = {

@@ -495,7 +495,7 @@ async function announceNextTrain() {
             }
         }
         clips.push(audioDir + '/stations/' + getStationFilename(terminalForBound) + '.mp3');
-        clips.push(audioDir + '/directions/_bound.mp3');
+        clips.push(audioDir + '/directions/bound.mp3');
         usedTerminalNameBound = true;
     }
 
