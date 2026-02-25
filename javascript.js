@@ -419,15 +419,15 @@ async function announceNextTrain() {
         // Everything else uses terminalName_bound
         let terminalForBound = train.terminalName;
         if (train.terminalName.includes('-')) {
-            if (train.terminalName.includes('Flushing') || train.terminalName.includes('Forest Hills') || train.terminalName.includes('Bay Ridge')) {
-                // Keep full name for Flushing, Forest Hills, and Bay Ridge
-                terminalForBound = train.terminalName;
-            } else if (train.terminalName.includes('Coney Island') || train.terminalName.includes('Van Cortlandt Park')) {
-                // Use first part before dash for Coney Island and Van Cortlandt Park
+            if (train.terminalName.includes('Van Cortlandt Park')) {
+                // Use first part before dash for Van Cortlandt Park
                 terminalForBound = train.terminalName.split('-')[0].trim();
-            } else {
-                // Use last part after dash
+            } else if (train.terminalName.includes('Astoria')) {
+                // Use last part after dash for Astoria
                 terminalForBound = train.terminalName.split('-').pop().trim();
+            } else {
+                // Use full name for everything else
+                terminalForBound = train.terminalName;
             }
         }
         nextWord = terminalForBound;
@@ -448,15 +448,15 @@ async function announceNextTrain() {
         // Rule 3: Everything else - use terminalName_bound
         let terminalForBound = train.terminalName;
         if (train.terminalName.includes('-')) {
-            if (train.terminalName.includes('Flushing') || train.terminalName.includes('Forest Hills') || train.terminalName.includes('Bay Ridge')) {
-                // Keep full name for Flushing, Forest Hills, and Bay Ridge
-                terminalForBound = train.terminalName;
-            } else if (train.terminalName.includes('Coney Island') || train.terminalName.includes('Van Cortlandt Park')) {
-                // Use first part before dash for Coney Island and Van Cortlandt Park
+            if (train.terminalName.includes('Van Cortlandt Park')) {
+                // Use first part before dash for Van Cortlandt Park
                 terminalForBound = train.terminalName.split('-')[0].trim();
-            } else {
-                // Use last part after dash
+            } else if (train.terminalName.includes('Astoria')) {
+                // Use last part after dash for Astoria
                 terminalForBound = train.terminalName.split('-').pop().trim();
+            } else {
+                // Use full name for everything else
+                terminalForBound = train.terminalName;
             }
         }
         clips.push(audioDir + '/stations/' + getStationFilename(terminalForBound) + '.mp3');
