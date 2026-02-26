@@ -377,7 +377,6 @@ function getOrCreateAudio(url) {
         if (now - entry.cachedAt < AUDIO_CACHE_TTL) {
             // Still valid - renew the rolling TTL and reuse
             entry.cachedAt = now;
-            entry.audio.currentTime = 0;
             return entry.audio;
         }
         // Expired - remove and create fresh
@@ -396,14 +395,21 @@ function getAudioDuration(src) {
             resolve(audio.duration);
             return;
         }
+        var resolved = false;
+        function done(val) {
+            if (resolved) return;
+            resolved = true;
+            resolve(val);
+        }
         audio.addEventListener('loadedmetadata', function onMeta() {
             audio.removeEventListener('loadedmetadata', onMeta);
-            resolve(audio.duration);
+            done(audio.duration);
         });
         audio.addEventListener('error', function onErr() {
             audio.removeEventListener('error', onErr);
-            resolve(0);
+            done(0);
         });
+        setTimeout(function() { done(0); }, 2000);
     });
 }
 
