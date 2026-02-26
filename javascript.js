@@ -410,7 +410,7 @@ async function playClipSequence(clips, gap) {
             await playPromise;
             // Add small delay between clips for smoother playback
             if (i < clips.length - 1) {
-                await new Promise(r => setTimeout(r, gap > 0 ? gap : 50));
+                await new Promise(r => setTimeout(r, gap > 0 ? gap : 45));
             }
         }
     }
@@ -524,7 +524,7 @@ async function announceNextTrain() {
     announcementPlaying = true;
     try {
         // Preload all clips for smooth playback
-        await playClipSequence(clips, 0);
+        await playClipSequence(clips, -3);
     } catch (e) {
         console.log('Announcement clip error:', e);
     }
