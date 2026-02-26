@@ -655,7 +655,7 @@ async function announceNextTrain() {
     announcementPlaying = true;
     try {
         // Preload all clips for smooth playback
-        await playClipSequence(clips, -3);
+        await playClipSequence(clips, 0);
     } catch (e) {
         console.log('Announcement clip error:', e);
     }
