@@ -540,8 +540,14 @@ async function playClipSequence(clips, gap) {
 
         if (gap < 0 && i < clips.length - 1) {
             let duration = durations[i] || 0;
-            let overlapStart = Math.max((duration * 1000) + gap, 100);
-            await new Promise(function(r) { setTimeout(r, overlapStart); });
+            if (duration > 0) {
+                // Duration known - overlap by starting next clip early
+                let overlapStart = Math.max((duration * 1000) + gap, 100);
+                await new Promise(function(r) { setTimeout(r, overlapStart); });
+            } else {
+                // Duration unknown (Safari) - wait for clip to finish
+                await playPromise;
+            }
         } else {
             await playPromise;
             if (i < clips.length - 1) {
