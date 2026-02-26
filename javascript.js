@@ -15,6 +15,7 @@ var announcementPlaying = false;
 var audioDir = 'audio7';
 var audioCache = new Map();       // URL -> { audio: HTMLAudioElement, cachedAt: timestamp }
 var audioCacheReady = false;
+var audioUnlocked = false;
 var AUDIO_CACHE_TTL = 25 * 60 * 60 * 1000;  // 25 hours in ms
 var routeBackgroundColors = {
     A: '#0039a6',
@@ -354,6 +355,21 @@ function pronounceStationName(name) {
                .replace(/-/g, ',. ');
 }
 
+function unlockAudio() {
+    if (audioUnlocked) return;
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var buf = ctx.createBuffer(1, 1, 22050);
+        var src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+        audioUnlocked = true;
+    } catch (e) {
+        console.log('Audio unlock error:', e);
+    }
+}
+
 function getOrCreateAudio(url) {
     var now = Date.now();
     if (audioCache.has(url)) {
@@ -441,8 +457,18 @@ async function prewarmAudioCache() {
     });
 
     await Promise.all(loadPromises);
-    audioCacheReady = true;
-    console.log('Audio cache pre-warmed:', files.length, 'files');
+    var loadedCount = 0;
+    files.forEach(function(url) {
+        if (audioCache.has(url) && audioCache.get(url).audio.readyState >= 4) {
+            loadedCount++;
+        }
+    });
+    if (loadedCount > 0) {
+        audioCacheReady = true;
+        console.log('Audio cache pre-warmed:', loadedCount, '/', files.length, 'files');
+    } else {
+        console.log('Audio cache pre-warm skipped (no files loaded, likely Safari restriction)');
+    }
 }
 
 async function preloadClips(clips) {
@@ -641,7 +667,8 @@ async function toggleAnnouncement() {
     var checkbox = document.getElementById("toggleAnnouncement");
     if (checkbox.checked) {
         announcementEnabled = true;
-        // Pre-warm common audio files on first toggle (within user gesture for iOS)
+        // Unlock audio session for Safari/iOS (must be synchronous within user gesture)
+        unlockAudio();
         await prewarmAudioCache();
         announceNextTrain();
         announcementInterval = setInterval(announceNextTrain, getAnnouncementIntervalMs());
@@ -816,6 +843,7 @@ loadStationData().then(() => {
     getUserSettings();
     preselectStation(stationId);
     runJob();
+    prewarmAudioCache();
 });
 
 // To mock the order of route display based on Times Square (ACENQRWS1237) and Grand Central (4567S) to blend S in middle
