@@ -13,6 +13,9 @@ var announcementInterval = null;
 var stationMap = {};
 var announcementPlaying = false;
 var audioDir = 'audio7';
+var audioCache = new Map();       // URL -> { audio: HTMLAudioElement, cachedAt: timestamp }
+var audioCacheReady = false;
+var AUDIO_CACHE_TTL = 25 * 60 * 60 * 1000;  // 25 hours in ms
 var routeBackgroundColors = {
     A: '#0039a6',
     C: '#0039a6',
@@ -351,23 +354,114 @@ function pronounceStationName(name) {
                .replace(/-/g, ',. ');
 }
 
+function getOrCreateAudio(url) {
+    var now = Date.now();
+    if (audioCache.has(url)) {
+        var entry = audioCache.get(url);
+        if (now - entry.cachedAt < AUDIO_CACHE_TTL) {
+            // Still valid - renew the rolling TTL and reuse
+            entry.cachedAt = now;
+            entry.audio.currentTime = 0;
+            return entry.audio;
+        }
+        // Expired - remove and create fresh
+        audioCache.delete(url);
+    }
+    var audio = new Audio(url);
+    audio.preload = 'auto';
+    audioCache.set(url, { audio: audio, cachedAt: now });
+    return audio;
+}
+
 function getAudioDuration(src) {
     return new Promise((resolve) => {
-        let audio = new Audio(src);
-        audio.addEventListener('loadedmetadata', () => resolve(audio.duration));
-        audio.addEventListener('error', () => resolve(0));
+        var audio = getOrCreateAudio(src);
+        if (audio.duration && !isNaN(audio.duration)) {
+            resolve(audio.duration);
+            return;
+        }
+        audio.addEventListener('loadedmetadata', function onMeta() {
+            audio.removeEventListener('loadedmetadata', onMeta);
+            resolve(audio.duration);
+        });
+        audio.addEventListener('error', function onErr() {
+            audio.removeEventListener('error', onErr);
+            resolve(0);
+        });
     });
 }
 
+async function prewarmAudioCache() {
+    if (audioCacheReady) return;
+
+    var files = [];
+
+    // Phrases (7 files)
+    ['there_is', 'a', 'an', 'approaching', 'approaching2', 'train', 'train_to'].forEach(function(f) {
+        files.push(audioDir + '/phrases/' + f + '.mp3');
+    });
+
+    // Directions (7 files)
+    ['bound', 'bronx_bound', 'brooklyn_bound', 'downtown', 'manhattan_bound', 'queens_bound', 'uptown'].forEach(function(f) {
+        files.push(audioDir + '/directions/' + f + '.mp3');
+    });
+
+    // Services (2 files)
+    ['express', 'local'].forEach(function(f) {
+        files.push(audioDir + '/services/' + f + '.mp3');
+    });
+
+    // Routes (23 files)
+    ['1','2','3','4','5','6','7','A','B','C','D','E','F','G','J','L','M','N','Q','R','S','W','Z'].forEach(function(f) {
+        files.push(audioDir + '/routes/' + f + '.mp3');
+    });
+
+    // Minutes 1-10 (10 files)
+    for (var i = 1; i <= 10; i++) {
+        files.push(audioDir + '/minutes/' + i + '.mp3');
+    }
+
+    var loadPromises = files.map(function(url) {
+        return new Promise(function(resolve) {
+            var audio = getOrCreateAudio(url);
+            if (audio.readyState >= 4) {
+                resolve();
+                return;
+            }
+            audio.addEventListener('canplaythrough', function onReady() {
+                audio.removeEventListener('canplaythrough', onReady);
+                resolve();
+            });
+            audio.addEventListener('error', function onErr() {
+                audio.removeEventListener('error', onErr);
+                resolve();
+            });
+            setTimeout(resolve, 3000);
+        });
+    });
+
+    await Promise.all(loadPromises);
+    audioCacheReady = true;
+    console.log('Audio cache pre-warmed:', files.length, 'files');
+}
+
 async function preloadClips(clips) {
-    // Preload all clips before playing for smoother first announcement
-    let preloadPromises = clips.map(clipUrl => {
-        return new Promise((resolve) => {
-            let audio = new Audio(clipUrl);
-            audio.preload = 'auto';
-            audio.oncanplaythrough = resolve;
-            audio.onerror = resolve; // Resolve even on error to not block
-            // Timeout after 2 seconds if clip doesn't load
+    var preloadPromises = clips.map(function(clipUrl) {
+        return new Promise(function(resolve) {
+            var audio = getOrCreateAudio(clipUrl);
+            // Already fully loaded - skip
+            if (audio.readyState >= 4) {
+                resolve();
+                return;
+            }
+            audio.addEventListener('canplaythrough', function onReady() {
+                audio.removeEventListener('canplaythrough', onReady);
+                resolve();
+            });
+            audio.addEventListener('error', function onErr() {
+                audio.removeEventListener('error', onErr);
+                resolve();
+            });
             setTimeout(resolve, 2000);
         });
     });
@@ -381,37 +475,41 @@ async function playClipSequence(clips, gap) {
     await preloadClips(clips);
 
     for (let i = 0; i < clips.length; i++) {
-        let audio = new Audio(clips[i]);
+        let audio = getOrCreateAudio(clips[i]);
+        audio.currentTime = 0;
 
-        // Preload to improve smoothness
-        audio.preload = 'auto';
-
-        let playPromise = new Promise((resolve) => {
-            audio.onended = resolve;
-            audio.onerror = (e) => {
-                console.log('Audio error for', clips[i], ':', e);
-                // Don't reject - just resolve to continue to next clip
+        let playPromise = new Promise(function(resolve) {
+            function onEnded() {
+                audio.removeEventListener('ended', onEnded);
+                audio.removeEventListener('error', onError);
                 resolve();
-            };
+            }
+            function onError(e) {
+                console.log('Audio error for', audio.src, ':', e);
+                audio.removeEventListener('ended', onEnded);
+                audio.removeEventListener('error', onError);
+                resolve();
+            }
+            audio.addEventListener('ended', onEnded);
+            audio.addEventListener('error', onError);
         });
 
         try {
             await audio.play();
         } catch (e) {
             console.log('Play error for', clips[i], ':', e);
-            // Continue to next clip even if this one failed
             continue;
         }
 
         if (gap < 0 && i < clips.length - 1) {
-            let duration = await getAudioDuration(clips[i]);
+            let duration = audio.duration || 0;
+            if (!duration) duration = await getAudioDuration(clips[i]);
             let overlapStart = Math.max((duration * 1000) + gap, 100);
-            await new Promise(r => setTimeout(r, overlapStart));
+            await new Promise(function(r) { setTimeout(r, overlapStart); });
         } else {
             await playPromise;
-            // Add small delay between clips for smoother playback
             if (i < clips.length - 1) {
-                await new Promise(r => setTimeout(r, gap > 0 ? gap : 45));
+                await new Promise(function(r) { setTimeout(r, gap > 0 ? gap : 45); });
             }
         }
     }
@@ -539,11 +637,12 @@ function getAnnouncementIntervalMs() {
     return val * 1000;
 }
 
-function toggleAnnouncement() {
-    let checkbox = document.getElementById("toggleAnnouncement");
+async function toggleAnnouncement() {
+    var checkbox = document.getElementById("toggleAnnouncement");
     if (checkbox.checked) {
         announcementEnabled = true;
-        // All announcements preload for smooth playback
+        // Pre-warm common audio files on first toggle (within user gesture for iOS)
+        await prewarmAudioCache();
         announceNextTrain();
         announcementInterval = setInterval(announceNextTrain, getAnnouncementIntervalMs());
     } else {
