@@ -506,13 +506,10 @@ async function playClipSequence(clips, gap) {
     // Preload all clips first for smoother playback
     await preloadClips(clips);
 
-    // When using negative gap (overlap), resolve all durations upfront
-    var durations = [];
-    if (gap < 0) {
-        durations = await Promise.all(clips.map(function(url) {
-            return getAudioDuration(url);
-        }));
-    }
+    // Resolve all durations upfront so every clip is ready before playback starts
+    var durations = await Promise.all(clips.map(function(url) {
+        return getAudioDuration(url);
+    }));
 
     for (let i = 0; i < clips.length; i++) {
         let audio = getOrCreateAudio(clips[i]);
@@ -662,7 +659,11 @@ async function announceNextTrain() {
     announcementPlaying = true;
     try {
         // Preload all clips for smooth playback
-        await playClipSequence(clips, -4);
+        var gapVal = parseInt(document.getElementById("announcementGapEntry").value);
+        if (isNaN(gapVal)) gapVal = -4;
+        if (gapVal < -1000) gapVal = -1000;
+        if (gapVal > 1000) gapVal = 1000;
+        await playClipSequence(clips, gapVal);
     } catch (e) {
         console.log('Announcement clip error:', e);
     }
