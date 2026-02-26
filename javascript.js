@@ -458,7 +458,7 @@ async function prewarmAudioCache() {
                 audio.removeEventListener('error', onErr);
                 resolve();
             });
-            setTimeout(resolve, 3000);
+            setTimeout(resolve, 6000);
         });
     });
 
@@ -482,7 +482,7 @@ async function preloadClips(clips) {
         return new Promise(function(resolve) {
             var audio = getOrCreateAudio(clipUrl);
             // Already fully loaded - skip
-            if (audio.readyState >= 4) {
+            if (audio.readyState >= 5) {
                 resolve();
                 return;
             }
