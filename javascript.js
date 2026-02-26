@@ -47,7 +47,8 @@ async function init() {
 
 async function loadSomeDisplay (stationId) {
     console.log("Loading display for stationID ", stationId);
-    const API_URL = `https://mta-api-project.uc.r.appspot.com/by-id/${stationId}`;
+    //const API_URL = `https://mta-api-project.uc.r.appspot.com/by-id/${stationId}`;
+    const API_URL = `https://mtapibaron.onrender.com/by-id/${stationId}`;
     //const API_URL = `http://127.0.0.1:5000/by-id/${stationId}`;
     if ((stationId.length > 3) || (isNaN(stationId[1])) || (isNaN(stationId[2])))
     {
