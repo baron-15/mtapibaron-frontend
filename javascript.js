@@ -53,17 +53,28 @@ async function init() {
 
 async function loadSomeDisplay (stationId) {
     console.log("Loading display for stationID ", stationId);
-    //const API_URL = `https://mta-api-project.uc.r.appspot.com/by-id/${stationId}`;
-    const API_URL = `https://mtapibaron.onrender.com/by-id/${stationId}`;
-    //const API_URL = `http://127.0.0.1:5000/by-id/${stationId}`;
+    const PRIMARY_URL = `https://mtapibaron.onrender.com/by-id/${stationId}`;
+    const BACKUP_URL = `https://mta-api-project.uc.r.appspot.com/by-id/${stationId}`;
+    //const PRIMARY_URL = `http://127.0.0.1:5000/by-id/${stationId}`;
     if ((stationId.length > 3) || (isNaN(stationId[1])) || (isNaN(stationId[2])))
     {
         console.log(stationId, 'did not pass the eye test.');
         throw new Error("It did not pass the eye test.");
     }
-    
-    await fetch(API_URL)
-    .then(response => response.json())
+
+    let response;
+    try {
+        const controller = new AbortController();
+        console.log('Trying primary API.');
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        response = await fetch(PRIMARY_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+    } catch (e) {
+        console.log("Primary API failed, falling back...", e.message);
+        response = await fetch(BACKUP_URL);
+    }
+
+    await response.json()
     .then(responseJson => {
         let currentDate = new Date();
         let options = { timeZone: 'America/New_York' };
