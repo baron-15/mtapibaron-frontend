@@ -16,6 +16,8 @@ var audioDir = 'audio7';
 var audioCache = new Map();       // URL -> { audio: HTMLAudioElement, cachedAt: timestamp }
 var audioCacheReady = false;
 var audioUnlocked = false;
+var playbackAudio = null;  // Single reusable Audio element - blessed by user gesture for Safari
+var unlockPlayPromise = null;
 var AUDIO_CACHE_TTL = 25 * 60 * 60 * 1000;  // 25 hours in ms
 var routeBackgroundColors = {
     A: '#0039a6',
@@ -358,12 +360,45 @@ function pronounceStationName(name) {
 function unlockAudio() {
     if (audioUnlocked) return;
     try {
+        // Unlock WebAudio API
         var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
         var buf = ctx.createBuffer(1, 1, 22050);
         var src = ctx.createBufferSource();
         src.buffer = buf;
         src.connect(ctx.destination);
         src.start(0);
+
+        // Create a single reusable Audio element and bless it within the user gesture.
+        // Safari remembers this element as gesture-authorized for future .play() calls.
+        // Use a programmatic silent WAV (iOS ignores volume=0, so a real file would be audible).
+        playbackAudio = new Audio();
+        var numSamples = 4410; // 0.1s at 44100Hz
+        var dataSize = numSamples * 2;
+        var wavBuf = new ArrayBuffer(44 + dataSize);
+        var wav = new DataView(wavBuf);
+        wav.setUint32(0, 0x52494646, false);  // "RIFF"
+        wav.setUint32(4, 36 + dataSize, true); // file size - 8
+        wav.setUint32(8, 0x57415645, false);  // "WAVE"
+        wav.setUint32(12, 0x666D7420, false); // "fmt "
+        wav.setUint32(16, 16, true);          // chunk size
+        wav.setUint16(20, 1, true);           // PCM
+        wav.setUint16(22, 1, true);           // mono
+        wav.setUint32(24, 44100, true);       // sample rate
+        wav.setUint32(28, 88200, true);       // byte rate
+        wav.setUint16(32, 2, true);           // block align
+        wav.setUint16(34, 16, true);          // bits per sample
+        wav.setUint32(36, 0x64617461, false); // "data"
+        wav.setUint32(40, dataSize, true);    // data size (samples are all 0 = silence)
+        var silentBlob = new Blob([wavBuf], { type: 'audio/wav' });
+        playbackAudio.src = URL.createObjectURL(silentBlob);
+        unlockPlayPromise = playbackAudio.play().then(function() {
+            playbackAudio.pause();
+            console.log('Playback audio element unlocked');
+        }).catch(function(e) {
+            console.log('Audio unlock play failed:', e);
+        });
+
         audioUnlocked = true;
     } catch (e) {
         console.log('Audio unlock error:', e);
@@ -379,13 +414,37 @@ function getOrCreateAudio(url) {
             entry.cachedAt = now;
             return entry.audio;
         }
-        // Expired - remove and create fresh
+        // Expired - revoke old blob URL if any and remove
+        if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
         audioCache.delete(url);
     }
     var audio = new Audio(url);
     audio.preload = 'auto';
-    audioCache.set(url, { audio: audio, cachedAt: now });
+    audioCache.set(url, { audio: audio, cachedAt: now, blobUrl: null });
     return audio;
+}
+
+// Fetch mp3 as blob and rebuild the cached Audio element from it (works on Safari)
+async function fetchAndCacheAudio(url) {
+    if (audioCache.has(url)) {
+        var entry = audioCache.get(url);
+        if (entry.blobUrl || entry.audio.readyState >= 4) return entry.audio;
+    }
+    try {
+        var response = await fetch(url);
+        var blob = await response.blob();
+        var blobUrl = URL.createObjectURL(blob);
+        var audio = new Audio(blobUrl);
+        audio.preload = 'auto';
+        var entry = audioCache.get(url) || {};
+        if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
+        audioCache.set(url, { audio: audio, cachedAt: Date.now(), blobUrl: blobUrl });
+        console.log('Cached:', url, '(' + (blob.size / 1024).toFixed(1) + ' KB)');
+        return audio;
+    } catch (e) {
+        console.log('Fetch audio failed for', url, ':', e);
+        return getOrCreateAudio(url);
+    }
 }
 
 function getAudioDuration(src) {
@@ -443,61 +502,19 @@ async function prewarmAudioCache() {
         files.push(audioDir + '/minutes/' + i + '.mp3');
     }
 
-    var loadPromises = files.map(function(url) {
-        return new Promise(function(resolve) {
-            var audio = getOrCreateAudio(url);
-            if (audio.readyState >= 4) {
-                resolve();
-                return;
-            }
-            audio.addEventListener('canplaythrough', function onReady() {
-                audio.removeEventListener('canplaythrough', onReady);
-                resolve();
-            });
-            audio.addEventListener('error', function onErr() {
-                audio.removeEventListener('error', onErr);
-                resolve();
-            });
-            setTimeout(resolve, 6000);
-        });
-    });
+    // Use fetch() to download mp3 data as blobs - works on Safari unlike preload='auto'
+    await Promise.all(files.map(function(url) {
+        return fetchAndCacheAudio(url);
+    }));
 
-    await Promise.all(loadPromises);
-    var loadedCount = 0;
-    files.forEach(function(url) {
-        if (audioCache.has(url) && audioCache.get(url).audio.readyState >= 4) {
-            loadedCount++;
-        }
-    });
-    if (loadedCount > 0) {
-        audioCacheReady = true;
-        console.log('Audio cache pre-warmed:', loadedCount, '/', files.length, 'files');
-    } else {
-        console.log('Audio cache pre-warm skipped (no files loaded, likely Safari restriction)');
-    }
+    audioCacheReady = true;
+    console.log('Audio cache pre-warmed:', files.length, 'files');
 }
 
 async function preloadClips(clips) {
-    var preloadPromises = clips.map(function(clipUrl) {
-        return new Promise(function(resolve) {
-            var audio = getOrCreateAudio(clipUrl);
-            // Already fully loaded - skip
-            if (audio.readyState >= 5) {
-                resolve();
-                return;
-            }
-            audio.addEventListener('canplaythrough', function onReady() {
-                audio.removeEventListener('canplaythrough', onReady);
-                resolve();
-            });
-            audio.addEventListener('error', function onErr() {
-                audio.removeEventListener('error', onErr);
-                resolve();
-            });
-            setTimeout(resolve, 2000);
-        });
-    });
-    await Promise.all(preloadPromises);
+    await Promise.all(clips.map(function(clipUrl) {
+        return fetchAndCacheAudio(clipUrl);
+    }));
 }
 
 async function playClipSequence(clips, gap) {
@@ -511,29 +528,60 @@ async function playClipSequence(clips, gap) {
         return getAudioDuration(url);
     }));
 
-    for (let i = 0; i < clips.length; i++) {
-        let audio = getOrCreateAudio(clips[i]);
-        audio.currentTime = 0;
+    // Use the single gesture-blessed audio element (Safari compatible)
+    var audio = playbackAudio || new Audio();
 
-        let playPromise = new Promise(function(resolve) {
-            function onEnded() {
-                audio.removeEventListener('ended', onEnded);
-                audio.removeEventListener('error', onError);
+    for (let i = 0; i < clips.length; i++) {
+        // Get blob URL from cache for instant playback, fall back to original URL
+        let entry = audioCache.get(clips[i]);
+        let srcUrl = (entry && entry.blobUrl) ? entry.blobUrl : clips[i];
+
+        // Switch source on the single element (no load() - it resets element state)
+        audio.src = srcUrl;
+
+        // Wait for new source to be decodable before playing
+        await new Promise(function(resolve) {
+            if (audio.readyState >= 2) { resolve(); return; }
+            function onReady() {
+                audio.removeEventListener('canplay', onReady);
+                audio.removeEventListener('error', onReady);
                 resolve();
             }
-            function onError(e) {
-                console.log('Audio error for', audio.src, ':', e);
-                audio.removeEventListener('ended', onEnded);
-                audio.removeEventListener('error', onError);
-                resolve();
-            }
-            audio.addEventListener('ended', onEnded);
-            audio.addEventListener('error', onError);
+            audio.addEventListener('canplay', onReady);
+            audio.addEventListener('error', onReady);
+            setTimeout(resolve, 2000);
         });
+
+        let clipDone = false;
+        let resolvePlay;
+        let playPromise = new Promise(function(resolve) { resolvePlay = resolve; });
+
+        let onEnded = function() {
+            if (clipDone) return;
+            clipDone = true;
+            audio.removeEventListener('ended', onEnded);
+            audio.removeEventListener('error', onError);
+            resolvePlay();
+        };
+        let onError = function(e) {
+            if (clipDone) return;
+            clipDone = true;
+            console.log('Audio error for', clips[i], ':', e);
+            audio.removeEventListener('ended', onEnded);
+            audio.removeEventListener('error', onError);
+            resolvePlay();
+        };
+        audio.addEventListener('ended', onEnded);
+        audio.addEventListener('error', onError);
 
         try {
             await audio.play();
         } catch (e) {
+            if (!clipDone) {
+                clipDone = true;
+                audio.removeEventListener('ended', onEnded);
+                audio.removeEventListener('error', onError);
+            }
             console.log('Play error for', clips[i], ':', e);
             continue;
         }
@@ -541,11 +589,17 @@ async function playClipSequence(clips, gap) {
         if (gap < 0 && i < clips.length - 1) {
             let duration = durations[i] || 0;
             if (duration > 0) {
-                // Duration known - overlap by starting next clip early
+                // Trim end of clip by starting next one early
                 let overlapStart = Math.max((duration * 1000) + gap, 100);
                 await new Promise(function(r) { setTimeout(r, overlapStart); });
+                // Clean up listeners before changing src
+                if (!clipDone) {
+                    clipDone = true;
+                    audio.removeEventListener('ended', onEnded);
+                    audio.removeEventListener('error', onError);
+                }
             } else {
-                // Duration unknown (Safari) - wait for clip to finish
+                // Duration unknown - wait for clip to finish
                 await playPromise;
             }
         } else {
@@ -689,6 +743,8 @@ async function toggleAnnouncement() {
         announcementEnabled = true;
         // Unlock audio session for Safari/iOS (must be synchronous within user gesture)
         unlockAudio();
+        // Wait for unlock play to finish before using the element for real clips
+        if (unlockPlayPromise) await unlockPlayPromise;
         await prewarmAudioCache();
         announceNextTrain();
         announcementInterval = setInterval(announceNextTrain, getAnnouncementIntervalMs());
