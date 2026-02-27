@@ -3,6 +3,9 @@
     "additionalDirectories": [
       "/Users/baron/repos/mtapibaron-frontend/audio7/minutes",
       "/Users/baron/repos/mtapibaron-frontend/audio7/stations"
+    ],
+    "allow": [
+      "WebFetch(domain:docs.fish.audio)"
     ]
   }
 }
