@@ -720,7 +720,7 @@ async function announceNextTrain() {
     try {
         // Preload all clips for smooth playback
         var gapVal = parseInt(document.getElementById("announcementGapEntry").value);
-        if (isNaN(gapVal)) gapVal = -4;
+        if (isNaN(gapVal)) gapVal = 0;
         if (gapVal < -1000) gapVal = -1000;
         if (gapVal > 1000) gapVal = 1000;
         await playClipSequence(clips, gapVal);
