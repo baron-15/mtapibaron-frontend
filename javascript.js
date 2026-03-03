@@ -19,6 +19,8 @@ var audioUnlocked = false;
 var playbackAudio = null;  // Single reusable Audio element - blessed by user gesture for Safari
 var unlockPlayPromise = null;
 var AUDIO_CACHE_TTL = 25 * 60 * 60 * 1000;  // 25 hours in ms
+var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+console.log('Browser detected:', isSafari ? 'Safari' : 'Chrome/Other', '(UA:', navigator.userAgent + ')');
 var routeBackgroundColors = {
     A: '#0039a6',
     C: '#0039a6',
@@ -530,27 +532,33 @@ async function preloadClips(clips) {
 
 async function playClipSequence(clips, gap) {
     gap = gap || 0;
-
-    // Preload all clips first for smoother playback
     await preloadClips(clips);
 
-    // Resolve all durations upfront so every clip is ready before playback starts
+    if (isSafari) {
+        // Safari: single blessed element, no true overlap (just trim end of clips)
+        console.log('Using Safari playback (single element, gap=' + gap + 'ms)');
+        return await playClipSequenceSafari(clips, gap);
+    } else {
+        // Chrome/Chromium: multi-element with true overlap support
+        console.log('Using Chrome playback (multi-element, gap=' + gap + 'ms)');
+        return await playClipSequenceChrome(clips, gap);
+    }
+}
+
+async function playClipSequenceSafari(clips, gap) {
+    // Resolve all durations upfront
     var durations = await Promise.all(clips.map(function(url) {
         return getAudioDuration(url);
     }));
 
-    // Use the single gesture-blessed audio element (Safari compatible)
     var audio = playbackAudio || new Audio();
 
     for (let i = 0; i < clips.length; i++) {
-        // Get blob URL from cache for instant playback, fall back to original URL
         let entry = audioCache.get(clips[i]);
         let srcUrl = (entry && entry.blobUrl) ? entry.blobUrl : clips[i];
-
-        // Switch source on the single element (no load() - it resets element state)
         audio.src = srcUrl;
 
-        // Wait for new source to be decodable before playing
+        // Wait for source to be ready
         await new Promise(function(resolve) {
             if (audio.readyState >= 2) { resolve(); return; }
             function onReady() {
@@ -600,19 +608,60 @@ async function playClipSequence(clips, gap) {
         if (gap < 0 && i < clips.length - 1) {
             let duration = durations[i] || 0;
             if (duration > 0) {
-                // Trim end of clip by starting next one early
                 let overlapStart = Math.max((duration * 1000) + gap, 100);
                 await new Promise(function(r) { setTimeout(r, overlapStart); });
-                // Clean up listeners before changing src
                 if (!clipDone) {
                     clipDone = true;
                     audio.removeEventListener('ended', onEnded);
                     audio.removeEventListener('error', onError);
                 }
             } else {
-                // Duration unknown - wait for clip to finish
                 await playPromise;
             }
+        } else {
+            await playPromise;
+            if (i < clips.length - 1) {
+                await new Promise(function(r) { setTimeout(r, gap > 0 ? gap : 45); });
+            }
+        }
+    }
+}
+
+async function playClipSequenceChrome(clips, gap) {
+    // Chrome: use separate Audio elements for each clip, allows true overlap
+    for (let i = 0; i < clips.length; i++) {
+        let audio = getOrCreateAudio(clips[i]);
+        audio.currentTime = 0;
+
+        let playPromise = new Promise(function(resolve) {
+            function onEnded() {
+                audio.removeEventListener('ended', onEnded);
+                audio.removeEventListener('error', onError);
+                resolve();
+            }
+            function onError(e) {
+                console.log('Audio error for', audio.src, ':', e);
+                audio.removeEventListener('ended', onEnded);
+                audio.removeEventListener('error', onError);
+                resolve();
+            }
+            audio.addEventListener('ended', onEnded);
+            audio.addEventListener('error', onError);
+        });
+
+        try {
+            await audio.play();
+        } catch (e) {
+            console.log('Play error for', clips[i], ':', e);
+            continue;
+        }
+
+        if (gap < 0 && i < clips.length - 1) {
+            // True overlap: next clip starts while current is still playing
+            let duration = audio.duration || 0;
+            if (!duration) duration = await getAudioDuration(clips[i]);
+            let overlapStart = Math.max((duration * 1000) + gap, 100);
+            await new Promise(function(r) { setTimeout(r, overlapStart); });
         } else {
             await playPromise;
             if (i < clips.length - 1) {
@@ -752,10 +801,14 @@ async function toggleAnnouncement() {
     var checkbox = document.getElementById("toggleAnnouncement");
     if (checkbox.checked) {
         announcementEnabled = true;
-        // Unlock audio session for Safari/iOS (must be synchronous within user gesture)
-        unlockAudio();
-        // Wait for unlock play to finish before using the element for real clips
-        if (unlockPlayPromise) await unlockPlayPromise;
+        // Safari: unlock audio session within user gesture
+        if (isSafari) {
+            console.log('Safari detected: unlocking audio with silent WAV');
+            unlockAudio();
+            if (unlockPlayPromise) await unlockPlayPromise;
+        } else {
+            console.log('Chrome detected: no unlock needed');
+        }
         await prewarmAudioCache();
         announceNextTrain();
         announcementInterval = setInterval(announceNextTrain, getAnnouncementIntervalMs());
