@@ -510,10 +510,13 @@ async function prewarmAudioCache() {
         files.push(audioDir + '/routes/' + f + '.mp3');
     });
 
-    // Minutes 1-10 (10 files)
-    for (var i = 1; i <= 10; i++) {
-        files.push(audioDir + '/minutes/' + i + '.mp3');
+    // Minutes separate folder (1-20 numbers + minute/minutes/away = 23 files)
+    for (var i = 1; i <= 20; i++) {
+        files.push(audioDir + '/minutes/separate/' + i + '.mp3');
     }
+    ['minute', 'minutes', 'away'].forEach(function(f) {
+        files.push(audioDir + '/minutes/separate/' + f + '.mp3');
+    });
 
     // Use fetch() to download mp3 data as blobs - works on Safari unlike preload='auto'
     await Promise.all(files.map(function(url) {
@@ -773,7 +776,15 @@ async function announceNextTrain() {
         clips.push(audioDir + '/phrases/approaching.mp3');
     } else {
         let min = Math.min(Math.max(minuteDifference, 1), 99);
-        clips.push(audioDir + '/minutes/' + min + '.mp3');
+        if (min <= 20) {
+            // Use separate files for 1-20 minutes
+            clips.push(audioDir + '/minutes/separate/' + min + '.mp3');
+            clips.push(audioDir + '/minutes/separate/' + (min === 1 ? 'minute' : 'minutes') + '.mp3');
+            clips.push(audioDir + '/minutes/separate/away.mp3');
+        } else {
+            // Use single file for 21+ minutes
+            clips.push(audioDir + '/minutes/' + min + '.mp3');
+        }
     }
 
     announcementPlaying = true;
