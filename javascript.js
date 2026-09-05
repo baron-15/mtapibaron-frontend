@@ -215,7 +215,7 @@ function renderTrainRows() {
         let numDiv = document.createElement("div");
         numDiv.className = "num";
         numDiv.id = "num" + k;
-        numDiv.innerHTML = k + ".";
+        numDiv.textContent = String(k);
 
         let routeDiv = document.createElement("div");
         routeDiv.className = "route";

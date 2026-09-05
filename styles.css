@@ -180,9 +180,50 @@ input, select {
 }
 
 .trainrow.v2 {
+  --row-background: #222222;
+  position: relative;
+  isolation: isolate;
+  background-color: transparent;
+  box-shadow: none;
+  padding-top: 0.7vh;
+  padding-bottom: 0.7vh;
   grid-template-columns: 2.5vw 5.75vw minmax(0, 1fr) 8vw;
-  /* Reserve both destination lines in every row: (3.75 + 1.55) * 1.2 + 0.01 = 6.37vw. */
-  grid-template-rows: 6.4vw;
+  /* Reserve both destination lines in every row: (3.4 + 2.1) * 1.2 + 0.01 = 6.61vw. */
+  grid-template-rows: 6.65vw;
+}
+
+.trainrow.v2::before {
+  content: '';
+  position: absolute;
+  /* Leave the number on black, retaining 0.75vw of padding before the badge. */
+  left: calc(2.5vw + 1.45vw);
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  background-color: var(--row-background);
+  pointer-events: none;
+}
+
+.trainrow.v2 > .num {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.trainrow.v2 .routeText {
+  /* Enlarge the glyphs within the existing centered circle/diamond layout. */
+  font-size: 1.1em;
+}
+
+.trainrow.v2 + .trainrow.v2 {
+  /* Expose the black board between the grey rows. */
+  margin-top: 0.75vw;
+}
+
+.trainrow.v2 > * {
+  /* No bottom divider to compensate for: center within the full row. */
+  top: 0;
+  z-index: 1;
 }
 
 .trainrow.v2 > .terminal {
@@ -199,12 +240,16 @@ input, select {
 }
 
 .terminal-primary {
+  font-size: 3.4vw;
   font-weight: normal;
+  /* Arial has no medium face; a fine stroke adds weight without jumping to bold. */
+  -webkit-text-stroke: 0.045em currentColor;
+  letter-spacing: 0.025em;
 }
 
 .terminal-secondary {
   margin-top: 0.01vw;
-  font-size: 1.55vw;
+  font-size: 2.1vw;
   font-weight: normal;
 }
 
@@ -219,12 +264,12 @@ input, select {
 }
 
 .eta-number {
-  font-size: 4.83vw;
-  font-weight: bold;
+  font-size: 4.7vw;
+  font-weight: 500;
 }
 
 .eta-unit {
-  margin-top: 0.45vw;
+  margin-top: 0.6vw;
   font-size: 1.15vw;
   font-weight: normal;
   letter-spacing: 0.08em;
@@ -249,33 +294,48 @@ input, select {
 }
 
 .arrival-invert {
+  -webkit-animation: arrival-text 6s steps(1, end) infinite;
+          animation: arrival-text 6s steps(1, end) infinite;
+}
+
+.arrival-invert::before {
   -webkit-animation: arrival-invert 6s steps(1, end) infinite;
           animation: arrival-invert 6s steps(1, end) infinite;
 }
 
+@-webkit-keyframes arrival-text {
+  0%, 50%, 100% { color: #ffffff; }
+  25%, 75% { color: #111111; }
+}
+
+@keyframes arrival-text {
+  0%, 50%, 100% { color: #ffffff; }
+  25%, 75% { color: #111111; }
+}
+
 @-webkit-keyframes arrival-invert {
   0%, 50%, 100% {
-    background-color: #000000;
+    background-color: var(--row-background);
     color: #ffffff;
-    box-shadow: inset 0 -0.2vw 0 #ffffff;
+    box-shadow: inset 0 0 0 0.2vw #ffffff;
   }
   25%, 75% {
     background-color: #ffffff;
     color: #111111;
-    box-shadow: inset 0 -0.2vw 0 #111111;
+    box-shadow: inset 0 0 0 0.2vw #ffffff;
   }
 }
 
 @keyframes arrival-invert {
   0%, 50%, 100% {
-    background-color: #000000;
+    background-color: var(--row-background);
     color: #ffffff;
-    box-shadow: inset 0 -0.2vw 0 #ffffff;
+    box-shadow: inset 0 0 0 0.2vw #ffffff;
   }
   25%, 75% {
     background-color: #ffffff;
     color: #111111;
-    box-shadow: inset 0 -0.2vw 0 #111111;
+    box-shadow: inset 0 0 0 0.2vw #ffffff;
   }
 }
 
