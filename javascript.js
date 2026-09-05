@@ -3,6 +3,7 @@ var previousStationId = '640';
 var errorCount = 0;
 var selectedNumber = 2;
 var displayStationBlock = 0;
+var displayVersion = 'v2';
 var stationData = [];
 var hiddenRoutes = new Set();
 var lastTrainData = [];
@@ -13,6 +14,8 @@ var announcementInterval = null;
 var stationMap = {};
 var announcementPlaying = false;
 var audioDir = 'audio8';
+var noBoundDirections = ['Uptown', 'Downtown'];
+var boundDirections = ['Brooklyn', 'Bronx', 'Queens', 'Manhattan'];
 var audioCache = new Map();       // URL -> { audio: HTMLAudioElement, cachedAt: timestamp }
 var audioCacheReady = false;
 var audioUnlocked = false;
@@ -206,7 +209,7 @@ function renderTrainRows() {
     document.getElementById("trainBlock").innerHTML = "";
     for (let k = 1; k <= selectedNumber; k++) {
         let trainrowDiv = document.createElement("div");
-        trainrowDiv.className = "trainrow";
+        trainrowDiv.className = "trainrow " + displayVersion;
         trainrowDiv.id = "trainrow" + k;
 
         let numDiv = document.createElement("div");
@@ -239,13 +242,27 @@ function renderTrainRows() {
         document.getElementById("trainBlock").appendChild(trainrowDiv);
 
         if (filteredTrains.length >= k) {
-            routeTextDiv.innerHTML = filteredTrains[k - 1].route.charAt(0);
-            terminalDiv.innerHTML = filteredTrains[k - 1].terminalName;
-            let etaString = filteredTrains[k - 1].time;
+            let train = filteredTrains[k - 1];
+            routeTextDiv.textContent = train.route.charAt(0);
+
+            if (displayVersion === 'v2') {
+                renderV2Destination(terminalDiv, train);
+            } else {
+                terminalDiv.textContent = train.terminalName;
+            }
+
+            let etaString = train.time;
             let eta = new Date(etaString);
-            etaDiv.innerHTML = timeDifference(currentDate, eta);
-            etaDiv.innerHTML += ' min';
-            if (filteredTrains[k - 1].route.slice(-1) == "X") {
+            let etaMinutes = timeDifference(currentDate, eta);
+            etaDiv.dataset.minutes = etaMinutes;
+            if (displayVersion === 'v2') {
+                etaDiv.innerHTML = '<span class="eta-number"></span><span class="eta-unit">MIN</span>';
+                etaDiv.querySelector('.eta-number').textContent = etaMinutes;
+            } else {
+                etaDiv.textContent = etaMinutes + ' min';
+            }
+
+            if (train.route.slice(-1) == "X") {
                 routeDiv.classList.remove('circle');
                 routeDiv.classList.add('diamond');
             } else {
@@ -257,6 +274,23 @@ function renderTrainRows() {
             terminalDiv.innerHTML = "No scheduled";
             etaDiv.innerHTML = "";
         }
+    }
+}
+
+function renderV2Destination(terminalDiv, train) {
+    const useDirectionLabel = noBoundDirections.includes(train.directionLabel) || boundDirections.includes(train.directionLabel);
+    const primaryText = useDirectionLabel ? train.directionLabel : train.terminalName;
+
+    let primaryDiv = document.createElement('div');
+    primaryDiv.className = 'terminal-primary';
+    primaryDiv.textContent = primaryText;
+    terminalDiv.appendChild(primaryDiv);
+
+    if (useDirectionLabel && train.terminalName) {
+        let secondaryDiv = document.createElement('div');
+        secondaryDiv.className = 'terminal-secondary';
+        secondaryDiv.textContent = train.terminalName;
+        terminalDiv.appendChild(secondaryDiv);
     }
 }
 
@@ -294,15 +328,17 @@ function arrivalUpdate () {
     let trainrowElements = document.querySelectorAll('.trainrow');
     trainrowElements.forEach(function(trainrowElement) {
         let etaElement = trainrowElement.querySelector('.eta');
-        var etaValue = etaElement.innerText; 
-        if (etaValue === '0 min') {
-            trainrowElement.classList.add('arrivalyellow');
-            etaElement.classList.add('blink');
-        }
+        var etaValue = etaElement.dataset.minutes || etaElement.innerText.split(' ')[0];
+        trainrowElement.classList.remove('arrivalyellow', 'arrival-invert');
+        etaElement.classList.remove('blink');
 
-        else {
-            trainrowElement.classList.remove('arrivalyellow');
-            etaElement.classList.remove('blink');
+        if (etaValue === '0') {
+            if (displayVersion === 'v2') {
+                trainrowElement.classList.add('arrival-invert');
+            } else {
+                trainrowElement.classList.add('arrivalyellow');
+                etaElement.classList.add('blink');
+            }
         }
     })
 
@@ -698,9 +734,6 @@ async function announceNextTrain() {
     let nextWord = '';
 
     // Check direction rules to determine what comes after a/an
-    let noBoundDirections = ['Uptown', 'Downtown'];
-    let boundDirections = ['Brooklyn', 'Bronx', 'Queens', 'Manhattan'];
-
     // Direction is always announced first, so check what direction will be said
     if (noBoundDirections.includes(train.directionLabel)) {
         // Uptown or Downtown
@@ -928,7 +961,8 @@ function saveUserSettings(cS, pS, sN, sB) {
         cookieCurrentStation: cS,
         cookiePreviousStation: pS,
         cookieSelectedNo: sN,
-        cookieDisplayStationBlock:sB
+        cookieDisplayStationBlock:sB,
+        cookieDisplayVersion: displayVersion
     };
 
     var userSettingsJSON = JSON.stringify(userSettings);
@@ -948,6 +982,7 @@ function getUserSettings() {
         previousStationId = userSettings.cookiePreviousStation;
         selectedNumber = userSettings.cookieSelectedNo;
         displayStationBlock = userSettings.cookieDisplayStationBlock;
+        displayVersion = userSettings.cookieDisplayVersion === 'v1' ? 'v1' : 'v2';
         let stationBlock = document.getElementById("stationBlock");
         let checkbox = document.getElementById("toggleStationBlock");
         if (displayStationBlock) {
@@ -958,8 +993,17 @@ function getUserSettings() {
             checkbox.checked = false;
           }
         editSelectedNumber.value = selectedNumber;
+        document.getElementById('displayVersion').value = displayVersion;
         console.log("Cookie found!", stationId, ", ", previousStationId, ", ", selectedNumber, ",", displayStationBlock);
     }
+}
+
+function updateDisplayVersion() {
+    displayVersion = document.getElementById('displayVersion').value === 'v1' ? 'v1' : 'v2';
+    renderTrainRows();
+    arrivalUpdate();
+    routeUpdate();
+    saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
 }
 
 function toggleStationBlock() {

@@ -70,6 +70,13 @@
                         </select>
                     </span>
                     <span>
+                        <label for="displayVersion">Display:</label>
+                        <select id="displayVersion" onchange="updateDisplayVersion()">
+                            <option value="v1">v1</option>
+                            <option value="v2" selected>v2</option>
+                        </select>
+                    </span>
+                    <span>
                         <label for="toggleStationBlock">Display Station Block:</label>
                         <input type="checkbox" id="toggleStationBlock" onchange="toggleStationBlock()" checked>
                     </span>
