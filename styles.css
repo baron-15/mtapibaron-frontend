@@ -116,6 +116,11 @@ input, select {
     font-size: 3.75vw;
 }
 
+.train:has(> .trainrow.v2) {
+    /* Scale v2's 2048px-wide reference artwork to the board. */
+    container-type: inline-size;
+}
+
 .trainrow {
     display: grid;
     grid-template-columns: 2.5vw 5.75vw auto 13vw;
@@ -135,6 +140,17 @@ input, select {
   position: relative;
   top: -0.1vw;
 }
+
+.trainrow.v1 {
+  /* Double the two icon gaps; preserve the terminal-to-countdown gap. */
+  column-gap: 0;
+  grid-template-columns: [number] 2.5vw 2.9vw [route] 5.75vw 2.9vw [terminal] auto 1.45vw [eta] 13vw;
+}
+
+.trainrow.v1 > .num { grid-column: number; }
+.trainrow.v1 > .route { grid-column: route; }
+.trainrow.v1 > .terminal { grid-column: terminal; }
+.trainrow.v1 > .eta { grid-column: eta; }
 
 .route.circle{
     display: inline-flex;
@@ -175,28 +191,59 @@ input, select {
     text-align: left;
 }
 
+.trainrow.v2 .route {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  width: var(--badge-size);
+  height: var(--badge-size);
+  font-size: calc(5.8594cqw * var(--row-scale));
+  line-height: 1;
+}
+
+.trainrow.v2 .route.circle::before { content: none; }
+
+.trainrow.v2 .route.diamond {
+  width: calc(var(--badge-size) / 1.414214);
+  height: calc(var(--badge-size) / 1.414214);
+  transform: rotate(45deg);
+}
+
+.trainrow.v2 .route.diamond > .routeText {
+  display: block;
+  width: auto;
+  height: auto;
+}
+
 .trainrow > .eta{
     text-align: right;
 }
 
 .trainrow.v2 {
   --row-background: #222222;
+  /* Shrink row contents together while retaining the board's horizontal gaps. */
+  --row-scale: 0.81;
+  --badge-size: calc(8.9844cqw * var(--row-scale));
+  font-size: calc(5.8594cqw * var(--row-scale));
+  font-weight: 400;
+  line-height: 1.2;
   position: relative;
   isolation: isolate;
   background-color: transparent;
   box-shadow: none;
-  padding-top: 0.7vh;
-  padding-bottom: 0.7vh;
-  grid-template-columns: 2.5vw 5.75vw minmax(0, 1fr) 8vw;
-  /* Reserve both destination lines in every row: (3.4 + 2.1) * 1.2 + 0.01 = 6.61vw. */
-  grid-template-rows: 6.65vw;
+  padding: 0 2.3438cqw 0 0;
+  column-gap: 0.8789cqw;
+  grid-template-columns: 5.6641cqw var(--badge-size) minmax(0, 1fr) 10cqw;
+  /* Fixed tracks keep one- and two-line destinations the same height. */
+  grid-template-rows: calc(12.0117cqw * var(--row-scale));
 }
 
 .trainrow.v2::before {
   content: '';
   position: absolute;
-  /* Leave the number on black, retaining 0.75vw of padding before the badge. */
-  left: calc(2.5vw + 1.45vw);
+  /* 102px black number gutter in the 2048px-wide reference. */
+  left: 4.9805cqw;
   right: 0;
   top: 0;
   bottom: 0;
@@ -207,17 +254,14 @@ input, select {
 
 .trainrow.v2 > .num {
   color: #ffffff;
-  font-weight: 600;
-}
-
-.trainrow.v2 .routeText {
-  /* Enlarge the glyphs within the existing centered circle/diamond layout. */
-  font-size: 1.1em;
+  font-size: calc(5.2734cqw * var(--row-scale));
+  font-weight: 700;
+  padding-left: 0.293cqw;
 }
 
 .trainrow.v2 + .trainrow.v2 {
   /* Expose the black board between the grey rows. */
-  margin-top: 0.75vw;
+  margin-top: 0.9766cqw;
 }
 
 .trainrow.v2 > * {
@@ -227,9 +271,14 @@ input, select {
 }
 
 .trainrow.v2 > .terminal {
+  /* Add one existing grid gap here, doubling only the icon-to-terminal gap. */
+  margin-left: 0.8789cqw;
   min-width: 0;
-  /* Leave room for descenders inside the clipped, ellipsized text lines. */
-  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Tighter reference-style stacking, with enough line height for descenders. */
+  line-height: 1.1;
 }
 
 .terminal-primary,
@@ -240,38 +289,41 @@ input, select {
 }
 
 .terminal-primary {
-  font-size: 3.4vw;
-  font-weight: normal;
-  /* Arial has no medium face; a fine stroke adds weight without jumping to bold. */
-  -webkit-text-stroke: 0.045em currentColor;
-  letter-spacing: 0.025em;
+  font-size: calc(5.8594cqw * var(--row-scale));
+}
+
+.trainrow.v2 .terminal-primary,
+.trainrow.v2 .eta-number {
+  font-weight: 600;
 }
 
 .terminal-secondary {
-  margin-top: 0.01vw;
-  font-size: 2.1vw;
+  margin-top: 0;
+  font-size: calc(2.7344cqw * var(--row-scale));
   font-weight: normal;
 }
 
 .trainrow.v2 > .eta {
+  white-space: nowrap;
   align-self: stretch;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  line-height: 0.8;
+  line-height: 1;
   text-align: center;
+  /* Optically center the numeral and unit, rather than their font line boxes. */
+  transform: translateY(calc(-0.1953cqw * var(--row-scale)));
 }
 
-.eta-number {
-  font-size: 4.7vw;
-  font-weight: 500;
+.trainrow.v2 .eta-number {
+  font-size: calc(8.2031cqw * var(--row-scale));
 }
 
-.eta-unit {
-  margin-top: 0.6vw;
-  font-size: 1.15vw;
-  font-weight: normal;
+.trainrow.v2 .eta-unit {
+  margin-top: 0;
+  font-size: calc(1.5625cqw * var(--row-scale));
+  font-weight: 700;
   letter-spacing: 0.08em;
 }
 

@@ -215,7 +215,7 @@ function renderTrainRows() {
         let numDiv = document.createElement("div");
         numDiv.className = "num";
         numDiv.id = "num" + k;
-        numDiv.textContent = String(k);
+        numDiv.textContent = displayVersion === 'v1' ? k + '.' : String(k);
 
         let routeDiv = document.createElement("div");
         routeDiv.className = "route";
@@ -259,7 +259,7 @@ function renderTrainRows() {
                 etaDiv.innerHTML = '<span class="eta-number"></span><span class="eta-unit">MIN</span>';
                 etaDiv.querySelector('.eta-number').textContent = etaMinutes;
             } else {
-                etaDiv.textContent = etaMinutes + ' min';
+                etaDiv.textContent = etaMinutes + ' Min';
             }
 
             if (train.route.slice(-1) == "X") {
@@ -277,9 +277,31 @@ function renderTrainRows() {
     }
 }
 
+function getV2DirectionLabel(train) {
+    const direction = train.directionLabel;
+    const boroughNames = { M: 'Manhattan', Bk: 'Brooklyn', Q: 'Queens' };
+    const terminalStopId = (train.terminal || '').replace(/[NS]$/, '');
+    const terminalStation = stationData.find(station => station.gtfsStopId === terminalStopId);
+    const terminalBorough = terminalStation && boroughNames[terminalStation.borough];
+
+    // Bronx and unknown destinations retain the existing direction label.
+    if (!terminalBorough) return direction;
+
+    if (noBoundDirections.includes(direction)) {
+        const currentStation = stationData.find(station => station.gtfsStopId === stationId);
+        if (currentStation && currentStation.borough === 'M' && terminalBorough !== 'Manhattan') {
+            return direction + ' & ' + terminalBorough;
+        }
+    } else if (Object.values(boroughNames).includes(direction) && direction !== terminalBorough) {
+        return direction + ' & ' + terminalBorough;
+    }
+
+    return direction;
+}
+
 function renderV2Destination(terminalDiv, train) {
     const useDirectionLabel = noBoundDirections.includes(train.directionLabel) || boundDirections.includes(train.directionLabel);
-    const primaryText = useDirectionLabel ? train.directionLabel : train.terminalName;
+    const primaryText = useDirectionLabel ? getV2DirectionLabel(train) : train.terminalName;
 
     let primaryDiv = document.createElement('div');
     primaryDiv.className = 'terminal-primary';
@@ -729,81 +751,37 @@ async function announceNextTrain() {
     let clips = [];
     clips.push(audioDir + '/phrases/there_is.mp3');
 
-    // Determine the next word for a/an check
     let alwaysLocalRoutes = ['S', 'SI', 'H', 'L', 'G'];
-    let nextWord = '';
+    let routeLetter = train.route.charAt(0);
+    let serviceFile = alwaysLocalRoutes.includes(routeLetter) ? null
+        : (train.service.toLowerCase() === 'expressdiamond' ? 'express' : train.service.toLowerCase());
+    let hasDirection = noBoundDirections.includes(train.directionLabel) || boundDirections.includes(train.directionLabel);
 
-    // Check direction rules to determine what comes after a/an
-    // Direction is always announced first, so check what direction will be said
-    if (noBoundDirections.includes(train.directionLabel)) {
-        // Uptown or Downtown
-        nextWord = train.directionLabel;
-    } else if (boundDirections.includes(train.directionLabel)) {
-        // Brooklyn/Bronx/Queens/Manhattan bound
-        nextWord = train.directionLabel;
-    } else {
-        // Everything else uses terminalName_bound
-        let terminalForBound = train.terminalName;
-        if (train.terminalName.includes('-')) {
-            if (train.terminalName.includes('Van Cortlandt Park')) {
-                // Use first part before dash for Van Cortlandt Park
-                terminalForBound = train.terminalName.split('-')[0].trim();
-            } else if (train.terminalName.includes('Astoria')) {
-                // Use last part after dash for Astoria
-                terminalForBound = train.terminalName.split('-').pop().trim();
-            } else {
-                // Use full name for everything else
-                terminalForBound = train.terminalName;
-            }
-        }
-        nextWord = terminalForBound;
-    }
+    // Terminal-specific announcements now start with service (or the route when
+    // service is omitted), so choose a/an from that spoken word, not the terminal.
+    let nextWord = hasDirection ? train.directionLabel : (serviceFile || routeLetter);
+    let needsAn = !hasDirection && !serviceFile
+        ? ['H', 'L', 'S'].includes(routeLetter)
+        : /^[AEIOU]/i.test(nextWord);
+    clips.push(audioDir + '/phrases/' + (needsAn ? 'an' : 'a') + '.mp3');
 
-    // Add a/an based on the actual next word
-    clips.push(/^[AEIOU]/i.test(nextWord) ? audioDir + '/phrases/an.mp3' : audioDir + '/phrases/a.mp3');
-
-    // Direction logic with new rules
-    let usedTerminalNameBound = false;
+    // Preserve Uptown/Downtown and borough-bound prefixes only.
     if (noBoundDirections.includes(train.directionLabel)) {
         // Rule 1: Uptown/Downtown - keep as-is
         clips.push(audioDir + '/directions/' + train.directionLabel.toLowerCase() + '.mp3');
     } else if (boundDirections.includes(train.directionLabel)) {
         // Rule 2: Brooklyn/Bronx/Queens/Manhattan - use direction_bound
         clips.push(audioDir + '/directions/' + train.directionLabel.toLowerCase() + '_bound.mp3');
-    } else {
-        // Rule 3: Everything else - use terminalName_bound
-        let terminalForBound = train.terminalName;
-        if (train.terminalName.includes('-')) {
-            if (train.terminalName.includes('Van Cortlandt Park')) {
-                // Use first part before dash for Van Cortlandt Park
-                terminalForBound = train.terminalName.split('-')[0].trim();
-            } else if (train.terminalName.includes('Astoria')) {
-                // Use last part after dash for Astoria
-                terminalForBound = train.terminalName.split('-').pop().trim();
-            } else {
-                // Use full name for everything else
-                terminalForBound = train.terminalName;
-            }
-        }
-        clips.push(audioDir + '/stations/' + getStationFilename(terminalForBound) + '.mp3');
-        clips.push(audioDir + '/directions/bound.mp3');
-        usedTerminalNameBound = true;
     }
 
     // Service announcements
-    if (!alwaysLocalRoutes.includes(train.route.charAt(0))) {
-        let serviceFile = train.service.toLowerCase() === 'expressdiamond' ? 'express' : train.service.toLowerCase();
+    if (serviceFile) {
         clips.push(audioDir + '/services/' + serviceFile + '.mp3');
     }
-    clips.push(audioDir + '/routes/' + train.route.charAt(0) + '.mp3');
+    clips.push(audioDir + '/routes/' + routeLetter + '.mp3');
 
-    // If we already said terminalName_bound, just say "train", otherwise say "train to terminalName"
-    if (usedTerminalNameBound) {
-        clips.push(audioDir + '/phrases/train.mp3');
-    } else {
-        clips.push(audioDir + '/phrases/train_to.mp3');
-        clips.push(audioDir + '/stations/' + getStationFilename(train.terminalName) + '.mp3');
-    }
+    clips.push(audioDir + '/phrases/train_to.mp3');
+    clips.push(audioDir + '/stations/' + getStationFilename(train.terminalName) + '.mp3');
 
     if (minuteDifference <= 0) {
         clips.push(audioDir + '/phrases/approaching.mp3');
@@ -884,8 +862,9 @@ async function loadStationData() {
         const cols = lines[i].split(',');
         const gtfsStopId = cols[0].trim();
         const stopName = cols[5].trim();
+        const borough = cols[6].trim();
         const daytimeRoutes = cols[8].trim().split(' ');
-        stationData.push({ gtfsStopId, stopName, routes: daytimeRoutes });
+        stationData.push({ gtfsStopId, stopName, borough, routes: daytimeRoutes });
     }
     populateRouteDropdown();
 }
