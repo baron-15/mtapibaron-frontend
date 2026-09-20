@@ -12,6 +12,9 @@
         <meta name="viewport" content="width=device-width">
         <link rel="stylesheet" href="styles.css">
         <link rel="manifest" href="manifest.json" />
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="theme-color" content="#000000">
     </head>
     <body onload="loadURLandSetStationId()">
         <div class = "block">
@@ -104,6 +107,9 @@
                     <span>
                         <label for="toggleBackgroundImage">Background image:</label>
                         <input type="checkbox" id="toggleBackgroundImage" onchange="toggleBackgroundImage()" checked>
+                    </span>
+                    <span>
+                        <button type="button" id="toggleFullscreen" onclick="toggleFullscreen()" hidden>Go full screen</button>
                     </span>
                     <span>
                         <label for="toggleAnnouncement">Voice Announcement:</label>

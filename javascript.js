@@ -541,6 +541,25 @@ function toggleBackgroundImage() {
     saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
 }
 
+// Full screen hides the browser or PWA title bar. It needs a user gesture each time, so it is a button, not a saved setting.
+function toggleFullscreen() {
+    const root = document.documentElement;
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    } else if (root.requestFullscreen) {
+        root.requestFullscreen({ navigationUI: 'hide' }).catch(error => console.log('Full screen unavailable:', error.message));
+    }
+}
+
+function setUpFullscreenButton() {
+    const button = document.getElementById('toggleFullscreen');
+    if (!button || !document.documentElement || !document.documentElement.requestFullscreen) return;
+    button.hidden = false;
+    const label = () => { button.textContent = document.fullscreenElement ? 'Exit full screen' : 'Go full screen'; };
+    document.addEventListener('fullscreenchange', label);
+    label();
+}
+
 function applyBackgroundImage(visible) {
     document.getElementById('toggleBackgroundImage').checked = visible;
     if (document.body) document.body.classList.toggle('no-background-image', !visible);
@@ -1181,6 +1200,7 @@ loadStationData().then(() => {
     return fetch(audioDir + '/station_map.json').then(r => r.json()).then(map => { stationMap = map; });
 }).then(() => {
     init();
+    setUpFullscreenButton();
     getUserSettings();
     preselectStation(stationId);
     runJob();
