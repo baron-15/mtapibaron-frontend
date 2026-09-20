@@ -1,12 +1,6 @@
 (function (root) {
     'use strict';
 
-    const MTA_ALERTS_URL = 'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts.json';
-    const REFRESH_MS = 60000;
-    // Service-alert feeds can be older than train predictions. GTFS recommends
-    // a ten-minute feed limit; connection failures only reuse our cache for five.
-    const MAX_FEED_AGE_MS = 600000;
-    const MAX_CACHE_AGE_MS = 300000;
     const HOLD_MS = 10000;
     const FADE_MS = 300;
     const ROUTES = new Set(['1', '2', '3', '4', '5', '6', '7', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'J', 'L', 'M', 'N', 'Q', 'R', 'W', 'Z', 'S', 'SI', 'FS', 'GS', 'H']);
@@ -16,70 +10,21 @@
         return route === 'SIR' ? 'SI' : route;
     }
 
-    function englishText(value) {
-        const translations = value && Array.isArray(value.translation) ? value.translation : [];
-        const translation = translations.find(item => String(item.language).toLowerCase() === 'en') ||
-            translations.find(item => !item.language);
-        return translation && typeof translation.text === 'string' ? translation.text.trim() : '';
+    function isUsable(payload, nowMs) {
+        return payload && ['ok', 'stale'].includes(payload.status) &&
+            Array.isArray(payload.alerts) && Number(payload.expiresAt) * 1000 > nowMs;
     }
 
-    function field(object, snake, camel) {
-        return object[snake] === undefined ? object[camel] : object[snake];
-    }
-
-    function isActive(alert, nowSeconds) {
-        const periods = field(alert, 'active_period', 'activePeriod');
-        if (!periods || Array.isArray(periods) && periods.length === 0) return true;
-        if (!Array.isArray(periods)) return false;
-        return periods.some(period =>
-            period &&
-            (period.start == null || Number(period.start) <= nowSeconds) &&
-            (period.end == null || nowSeconds < Number(period.end)));
-    }
-
-    function selectAlerts(feed, context, nowMs) {
-        if (!feed || !Array.isArray(feed.entity)) return [];
-        const routes = new Set((context.trains || []).map(train => normalizeRoute(train.route)));
+    function selectVisibleAlerts(payload, trains, nowMs) {
+        if (!isUsable(payload, nowMs)) return [];
+        const routes = new Set(trains.map(train => normalizeRoute(train.route)));
         if (!routes.size) return [];
-        const stops = new Set((context.stopIds || []).map(stop => String(stop).replace(/[NS]$/, '')));
-        const seen = new Set();
-        const alerts = [];
-        for (const entity of feed.entity) {
-            if (!entity || typeof entity !== 'object') continue;
-            const alert = entity.alert;
-            if (!alert || entity.is_deleted || entity.isDeleted || !isActive(alert, nowMs / 1000)) continue;
-            const selectors = field(alert, 'informed_entity', 'informedEntity');
-            const matchedRoutes = new Set();
-            let stationMatch = false;
-            for (const selector of Array.isArray(selectors) ? selectors : []) {
-                if (!selector) continue;
-                const agency = field(selector, 'agency_id', 'agencyId');
-                if (agency && agency !== 'MTASBWY') continue;
-                const route = normalizeRoute(field(selector, 'route_id', 'routeId') || selector.trip && field(selector.trip, 'route_id', 'routeId'));
-                const stop = field(selector, 'stop_id', 'stopId');
-                // Route alerts can affect a rider elsewhere along the line. Only
-                // stop-only notices are restricted to the selected station complex.
-                if (route && routes.has(route)) matchedRoutes.add(route);
-                else if (!route && stop && stops.has(String(stop).replace(/[NS]$/, ''))) stationMatch = true;
-            }
-            if (!matchedRoutes.size && !stationMatch) continue;
-            const mercury = alert['transit_realtime.mercury_alert'] || alert['.mercuryAlert'] || {};
-            const text = englishText(field(alert, 'header_text', 'headerText')) || englishText(field(alert, 'description_text', 'descriptionText'));
-            if (!text) continue;
-            const type = String(field(mercury, 'alert_type', 'alertType') || 'Service change');
-            const planned = String(entity.id).includes('planned_work') || /^Planned\s*-/.test(type);
-            const matched = [...matchedRoutes].sort();
-            const identity = entity.id ? String(entity.id) : JSON.stringify([type, text, matched]);
-            if (seen.has(identity)) continue;
-            seen.add(identity);
-            alerts.push({
-                id: identity, routes: matched, text, type, planned,
-                updatedAt: Number(field(mercury, 'updated_at', 'updatedAt')) || null,
-                schedule: englishText(field(mercury, 'human_readable_active_period', 'humanReadableActivePeriod')),
-                priority: planned ? 1 : 0
-            });
-        }
-        return alerts.sort((a, b) => a.priority - b.priority || (b.updatedAt || 0) - (a.updatedAt || 0) || a.id.localeCompare(b.id));
+        return payload.alerts.flatMap(alert => {
+            if (!alert || typeof alert.text !== 'string' || !Array.isArray(alert.routes) ||
+                alert.activeUntil != null && !(Number(alert.activeUntil) * 1000 > nowMs)) return [];
+            const matched = alert.routes.map(normalizeRoute).filter(route => routes.has(route));
+            return matched.length || alert.stationWide ? [{ ...alert, routes: matched }] : [];
+        });
     }
 
     function pageAlerts(alerts) {
@@ -145,11 +90,14 @@
                         const card = element('article', 'service-alert');
                         const meta = element('div', 'alert-meta');
                         const badges = element('div', 'alert-badges');
-                        alert.routes.forEach(route => badges.appendChild(routeBadge(route)));
-                        if (!alert.routes.length) badges.appendChild(element('span', 'alert-station-symbol', '!'));
-                        const warning = element('span', 'alert-warning-symbol', alert.planned ? '⚒' : '!');
+                        const symbols = alert.routes.length ? alert.routes.map(routeBadge) : [element('span', 'alert-station-symbol', '!')];
+                        symbols.slice(0, -1).forEach(badge => badges.appendChild(badge));
+                        const anchor = element('span', 'alert-badge-anchor');
+                        anchor.appendChild(symbols[symbols.length - 1]);
+                        const warning = element('span', 'alert-warning-symbol ' + (alert.planned ? 'alert-warning-planned' : 'alert-warning-delay'));
                         warning.setAttribute('aria-hidden', 'true');
-                        badges.appendChild(warning);
+                        anchor.appendChild(warning);
+                        badges.appendChild(anchor);
                         const summary = element('div', 'alert-summary');
                         summary.appendChild(element('h3', 'alert-type', alert.planned ? 'Planned work' : alert.type));
                         const timing = element('p', 'alert-timing');
@@ -183,26 +131,20 @@
         const now = options.now || Date.now;
         const later = options.setTimeout || root.setTimeout.bind(root);
         const cancel = options.clearTimeout || root.clearTimeout.bind(root);
-        const fetchFeed = options.fetch || root.fetch.bind(root);
         const view = options.render || createAlertsView(options.document || root.document);
         const reducedMotion = options.reducedMotion || (() => root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
         const isHidden = options.isHidden || (() => root.document && root.document.hidden);
-        let enabled = true, context = { trains: [], stopIds: [] }, contextReady = false;
-        let feed = null, failed = false, sourceStale = false, lastFetch = 0, pending = false;
+        let enabled = true, context = { trains: [], serviceAlerts: null }, contextReady = false;
         let alerts = [], signature = '', pageIndex = 0, fading = false;
-        let pollTimer = null, rotationTimer = null, swapTimer = null, controller = null, requestId = 0;
-        const backendRetryAt = new Map();
-        function fresh() {
-            const timestamp = Number(feed && feed.header && feed.header.timestamp) * 1000;
-            return timestamp > 0 && now() - timestamp <= MAX_FEED_AGE_MS &&
-                now() - lastFetch <= MAX_CACHE_AGE_MS && timestamp <= now() + REFRESH_MS;
-        }
+        let rotationTimer = null, swapTimer = null, expiryTimer = null;
         function render() {
+            const payload = context.serviceAlerts;
             let status = '';
             if (!contextReady) status = 'Waiting for station arrivals…';
             else if (!context.trains.length) status = 'No upcoming trains to match service alerts.';
-            else if (!fresh()) status = failed || feed ? 'Service alerts temporarily unavailable. Check mta.info for updates.' : 'Checking service alerts…';
-            else if (failed || sourceStale) status = 'Updates delayed. Showing the latest available MTA alerts.';
+            else if (payload && payload.status === 'loading') status = 'Checking service alerts…';
+            else if (!isUsable(payload, now())) status = 'Service alerts temporarily unavailable. Check mta.info for updates.';
+            else if (payload.status === 'stale') status = 'Updates delayed. Showing the latest available MTA alerts.';
             else if (!alerts.length) status = 'No current alerts for the arriving lines.';
             view({ enabled, alerts, pageIndex, fading, status, now: now() });
         }
@@ -215,7 +157,7 @@
             if (enabled && alerts.length > 2) rotationTimer = later(rotate, delay);
         }
         function updateAlerts() {
-            const next = fresh() ? selectAlerts(feed, context, now()) : [];
+            const next = selectVisibleAlerts(context.serviceAlerts, context.trains, now());
             const nextSignature = JSON.stringify(next);
             if (signature !== nextSignature) {
                 stopRotation();
@@ -223,6 +165,13 @@
                 signature = nextSignature;
                 pageIndex = 0;
                 scheduleRotation();
+            }
+            cancel(expiryTimer);
+            expiryTimer = null;
+            if (enabled && isUsable(context.serviceAlerts, now())) {
+                const deadlines = [context.serviceAlerts.expiresAt, ...alerts.map(alert => alert.activeUntil)]
+                    .map(value => Number(value) * 1000).filter(value => value > now());
+                expiryTimer = later(updateAlerts, Math.min(...deadlines) - now());
             }
             render();
         }
@@ -246,83 +195,29 @@
                 swapTimer = later(swap, duration);
             } else swap();
         }
-        function schedulePoll() {
-            cancel(pollTimer);
-            pollTimer = null;
-            if (enabled && context.trains.length) pollTimer = later(() => { pollTimer = null; refresh(); }, REFRESH_MS);
-        }
-        async function refresh() {
-            if (!enabled || !context.trains.length || pending) return;
-            cancel(pollTimer);
-            pollTimer = null;
-            pending = true;
-            const id = ++requestId;
-            const backend = context.apiBase && context.apiBase + '/service-alerts';
-            const urls = backend && !(backendRetryAt.get(backend) > now()) ? [backend, MTA_ALERTS_URL] : [MTA_ALERTS_URL];
-            let success = false;
-            for (const url of urls) {
-                const requestController = new AbortController();
-                controller = requestController;
-                const timeout = later(() => requestController.abort(), 6000);
-                try {
-                    const response = await fetchFeed(url, { signal: controller.signal });
-                    if (!response.ok) throw new Error('Alerts HTTP ' + response.status);
-                    const body = await response.json();
-                    const incoming = body.feed || body;
-                    const timestamp = Number(incoming.header && incoming.header.timestamp) * 1000;
-                    if (!Array.isArray(incoming.entity) || !timestamp || now() - timestamp > MAX_FEED_AGE_MS || timestamp > now() + REFRESH_MS) throw new Error('Invalid or expired alert feed');
-                    if (id !== requestId || !enabled) return;
-                    feed = incoming;
-                    sourceStale = Boolean(body.stale);
-                    lastFetch = now();
-                    failed = false;
-                    success = true;
-                    break;
-                } catch (error) {
-                    if (id !== requestId || !enabled) return;
-                    if (url === backend) backendRetryAt.set(backend, now() + MAX_CACHE_AGE_MS);
-                } finally { cancel(timeout); }
-            }
-            if (id !== requestId) return;
-            controller = null;
-            pending = false;
-            failed = !success;
-            updateAlerts();
-            schedulePoll();
-        }
         return {
-            refresh,
             setContext(value) {
                 const changedStation = context.stationId !== value.stationId;
-                context = { trains: [], stopIds: [], ...value };
-                if (!context.trains.length) { cancel(pollTimer); pollTimer = null; }
+                context = { trains: [], serviceAlerts: null, ...value };
                 contextReady = true;
                 if (changedStation) { stopRotation(); signature = ''; }
                 updateAlerts();
-                if (enabled && context.trains.length && (!feed || now() - lastFetch >= REFRESH_MS)) refresh();
-                else if (enabled && context.trains.length && pollTimer === null) schedulePoll();
             },
             setEnabled(value) {
                 enabled = Boolean(value);
                 if (!enabled) {
-                    requestId++;
-                    if (controller) controller.abort();
-                    controller = null;
-                    pending = false;
-                    cancel(pollTimer); pollTimer = null;
+                    cancel(expiryTimer); expiryTimer = null;
                     stopRotation();
                 } else {
                     signature = '';
                     updateAlerts();
-                    if (!feed || now() - lastFetch >= REFRESH_MS) refresh();
-                    else schedulePoll();
                 }
                 render();
             }
         };
     }
 
-    const api = { normalizeRoute, englishText, isActive, selectAlerts, pageAlerts, updatedLabel, createServiceAlerts, MTA_ALERTS_URL };
+    const api = { normalizeRoute, selectVisibleAlerts, pageAlerts, updatedLabel, createServiceAlerts };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.ServiceAlerts = createServiceAlerts();
 })(typeof window === 'undefined' ? globalThis : window);

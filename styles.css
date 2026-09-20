@@ -385,7 +385,7 @@ input, select {
 
 .service-alerts {
   color: #ffffff;
-  padding: 2.5vw 2.25vw 2vw;
+  padding: 5vw 2.25vw 2vw;
 }
 
 .service-alerts-heading {
@@ -402,12 +402,25 @@ input, select {
   margin: 0;
 }
 
+.service-alerts-title {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5vw;
+}
+
+.service-alerts-counter,
+.service-alerts-links {
+  font-size: clamp(12px, 1.65vw, 36px);
+  color: #aaaaaa;
+}
+
+.service-alerts-counter { white-space: nowrap; }
+.service-alerts-counter:empty { display: none; }
+
 .service-alerts-links {
   display: flex;
   align-items: baseline;
   gap: 1.5vw;
-  font-size: clamp(12px, 1.65vw, 36px);
-  color: #aaaaaa;
   text-align: right;
 }
 
@@ -484,23 +497,26 @@ input, select {
 .alert-route-wide { font-size: 0.75em; width: 2.04em; height: 2.04em; }
 .alert-station-symbol { background: #777777; }
 
+.alert-badge-anchor {
+  display: inline-flex;
+  position: relative;
+  width: 1.53em;
+  height: 1.53em;
+  flex: 0 0 auto;
+}
+
 .alert-warning-symbol {
   position: absolute;
-  right: -0.35em;
-  bottom: -0.1em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.2em;
-  height: 1.2em;
-  border: 0.08em solid #000000;
-  border-radius: 50%;
-  background: #ffc400;
-  color: #000000;
-  font-weight: 700;
-  font-size: 0.5em;
-  line-height: 1;
+  /* Match the reference: 56% of the route diameter, centered at 82% / 91%. */
+  left: 54%;
+  top: 63%;
+  width: 56%;
+  height: 56%;
+  background: center / contain no-repeat;
 }
+
+.alert-warning-planned { background-image: url("icons/service-planned-work.svg"); }
+.alert-warning-delay { background-image: url("icons/service-delay.svg"); }
 
 .alert-type { font-size: 1em; line-height: 1.2; margin: 0 0 0.2em; }
 .alert-timing { margin: 0; font-size: 0.9em; color: #dddddd; }

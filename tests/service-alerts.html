@@ -12,10 +12,10 @@
   #allRoutes { display: none; }
 </style>
 <div class="preview-controls">
-  <span>Local sample arrivals</span>
+  <span>Station response preview</span>
   <label>Alert source <select id="previewSource" onchange="setPreviewSource(this.value)">
-    <option value="sample">Sample alerts</option>
-    <option value="live">Live MTA alerts</option>
+    <option value="sample">Sample station response</option>
+    <option value="live">Live local station API</option>
     <option value="empty">No alerts</option>
     <option value="error">Unavailable</option>
   </select></label>
@@ -29,9 +29,11 @@
   <div class="train" id="trainBlock"></div>
   <section class="service-alerts" id="serviceAlertsBlock" aria-labelledby="serviceAlertsTitle">
     <header class="service-alerts-heading">
-      <h2 id="serviceAlertsTitle">Happening now</h2>
+      <div class="service-alerts-title">
+        <h2 id="serviceAlertsTitle">Happening now</h2>
+        <span class="service-alerts-counter" id="serviceAlertsCounter"></span>
+      </div>
       <div class="service-alerts-links">
-        <span id="serviceAlertsCounter"></span>
         <a href="https://www.mta.info/alerts" target="_blank" rel="noopener noreferrer">Visit mta.info for more</a>
       </div>
     </header>
@@ -48,26 +50,41 @@
     <label>Display service alerts <input type="checkbox" id="toggleServiceAlerts" onchange="toggleServiceAlerts()" checked></label>
     <button onclick="toggleRouteFilter('F')">Toggle F filter</button>
   </div>
+  <div class="misc" id="datetime"></div>
 </div>
 <script>
   const liveFetch = window.fetch.bind(window);
-  let alertSource = 'sample';
-  const previewNow = Date.now();
-  const sampleEntities = [
-    ['delay-b', 'B', 'Delays', 'Northbound [B] trains are running with delays after we moved a train with a door problem at 86 St.', 15],
-    ['lmm:planned_work:f', 'F', 'Planned - Reroute', 'Queens-bound [F] trains are running via the [E] line between 47-50 Sts-Rockefeller Ctr and Jackson Hts-Roosevelt Av.', 60],
-    ['lmm:planned_work:d', 'D', 'Planned - Stops Skipped', 'Uptown [D] trains skip 155 St while we replace tracks.', 120]
-  ].map(([id, route, type, text, minutes]) => ({ id, alert: {
-    active_period: [{ start: previewNow / 1000 - 3600 }],
-    informed_entity: [{ agency_id: 'MTASBWY', route_id: route }],
-    header_text: { translation: [{ language: 'en', text }] },
-    'transit_realtime.mercury_alert': { alert_type: type, updated_at: previewNow / 1000 - minutes * 60 }
-  } }));
+  let alertSource = new URLSearchParams(location.search).get('source') === 'live' ? 'live' : 'sample';
+  document.getElementById('previewSource').value = alertSource;
+  function sampleStationResponse() {
+    const now = Date.now();
+    const alerts = [
+      ['delay-b', 'B', 'Delays', 'Northbound [B] trains are running with delays after we moved a train with a door problem at 86 St.', 15],
+      ['lmm:planned_work:f', 'F', 'Planned - Reroute', 'Queens-bound [F] trains are running via the [E] line between 47-50 Sts-Rockefeller Ctr and Jackson Hts-Roosevelt Av.', 60],
+      ['lmm:planned_work:d', 'D', 'Planned - Stops Skipped', 'Uptown [D] trains skip 155 St while we replace tracks.', 120]
+    ].map(([id, route, type, text, minutes]) => ({
+      id, routes: [route], stationWide: false, type, text, planned: id.includes('planned_work'),
+      updatedAt: now / 1000 - minutes * 60, activeUntil: null, schedule: ''
+    }));
+    const alltrains = [
+      ['B', 'Uptown', '145 St', 'D13N', 1],
+      ['F', 'Uptown', 'Jamaica-179 St', 'F01N', 4],
+      ['D', 'Downtown', 'Coney Island-Stillwell Av', 'D43S', 5],
+      ['F', 'Uptown', 'Jamaica-179 St', 'F01N', 9]
+    ].map(([route, directionLabel, terminalName, terminal, minutes]) => ({
+      route, directionLabel, terminalName, terminal, time: new Date(now + minutes * 60000).toISOString()
+    }));
+    return { updated: new Date(now).toISOString(), data: [{
+      stationName: '42 St-Bryant Pk', stops: { D16: {} }, routes: ['B', 'D', 'F'], alltrains,
+      serviceAlerts: { status: alertSource === 'error' ? 'unavailable' : 'ok', updatedAt: now / 1000 - 1800,
+        expiresAt: now / 1000 + 300, alerts: ['empty', 'error'].includes(alertSource) ? [] : alerts }
+    }] };
+  }
   window.fetch = async (url, options) => {
-    if (!String(url).includes('alerts')) return new Promise(() => {});
-    if (alertSource === 'live') return liveFetch(url, options);
-    if (alertSource === 'error') throw new Error('Sample offline state');
-    return { ok: true, json: async () => ({ header: { timestamp: Date.now() / 1000 }, entity: alertSource === 'empty' ? [] : sampleEntities }) };
+    // Exercise the actual station response path, including its alert payload.
+    if (!String(url).includes('/by-id/')) return new Promise(() => {});
+    if (alertSource === 'live') return liveFetch('http://127.0.0.1:5001/by-id/D16', options);
+    return { ok: true, json: async () => sampleStationResponse() };
   };
 </script>
 <script src="../service-alerts.js"></script>
@@ -75,22 +92,11 @@
 <script>
   saveUserSettings = () => {};
   stationId = 'D16';
-  currentStationStops = ['D16'];
-  currentApiBase = ''; // Direct feed in this standalone preview.
-  lastFetchTime = new Date(previewNow);
-  lastTrainData = [
-    ['B', 'Uptown', '145 St', 'D13N', 1],
-    ['F', 'Uptown', 'Jamaica-179 St', 'F01N', 4],
-    ['D', 'Downtown', 'Coney Island-Stillwell Av', 'D43S', 5],
-    ['F', 'Uptown', 'Jamaica-179 St', 'F01N', 9]
-  ].map(([route, directionLabel, terminalName, terminal, minutes]) => ({
-    route, directionLabel, terminalName, terminal,
-    time: new Date(previewNow + minutes * 60000).toISOString()
-  }));
   function setPreviewSource(value) {
     alertSource = value;
-    ServiceAlerts.refresh();
+    loadSomeDisplay(stationId);
   }
-  applyRouteFilter();
+  loadSomeDisplay(stationId);
+  setInterval(() => loadSomeDisplay(stationId), 15000);
 </script>
 </html>

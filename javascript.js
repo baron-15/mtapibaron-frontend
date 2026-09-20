@@ -4,7 +4,7 @@ var errorCount = 0;
 var selectedNumber = 2;
 var displayStationBlock = 0;
 var displayServiceAlerts = true;
-var currentApiBase = 'https://mtapibaron.onrender.com';
+var currentServiceAlerts = null;
 var displayVersion = 'v2';
 var stationData = [];
 var hiddenRoutes = new Set();
@@ -77,7 +77,6 @@ async function loadSomeDisplay (stationId) {
     }
 
     let response;
-    let apiBase = 'https://mtapibaron.onrender.com';
     try {
         const controller = new AbortController();
         console.log('Trying primary API.');
@@ -86,17 +85,17 @@ async function loadSomeDisplay (stationId) {
         clearTimeout(timeoutId);
     } catch (e) {
         console.log("Primary API failed, falling back...", e.message);
-        apiBase = 'https://mta-api-project.uc.r.appspot.com';
         response = await fetch(BACKUP_URL);
     }
 
     await response.json()
     .then(responseJson => {
+        if (stationId !== globalThis.stationId) return;
         let currentDate = new Date();
         let options = { timeZone: 'America/New_York' };
         let currentDateTimeET = currentDate.toLocaleString('en-US', options);
         lastTrainData = responseJson.data[0].alltrains;
-        currentApiBase = apiBase;
+        currentServiceAlerts = responseJson.data[0].serviceAlerts || null;
         currentStationStops = Object.keys(responseJson.data[0].stops);
         lastFetchTime = currentDate;
         renderTrainRows();
@@ -521,8 +520,7 @@ function updateServiceAlertsContext() {
         window.ServiceAlerts.setContext({
             stationId,
             trains: getDisplayTrains(),
-            stopIds: currentStationStops,
-            apiBase: currentApiBase
+            serviceAlerts: currentServiceAlerts
         });
     }
 }
@@ -1044,7 +1042,8 @@ function onStopChange() {
 
     hiddenRoutes.clear();
     stationId = selectedStopId;
-    if (window.ServiceAlerts) window.ServiceAlerts.setContext({ stationId, trains: [], stopIds: [] });
+    currentServiceAlerts = null;
+    if (window.ServiceAlerts) window.ServiceAlerts.setContext({ stationId, trains: [], serviceAlerts: null });
     runJobOnce();
     saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
 }
