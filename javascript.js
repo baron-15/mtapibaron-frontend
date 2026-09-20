@@ -9,6 +9,13 @@ var hiddenRoutes = new Set();
 var lastTrainData = [];
 var lastFetchTime = null;
 var currentStationStops = [];
+var trainRotationIndex = 0;
+var trainRotationContext = '';
+var trainRotationNextAt = 0;
+var trainRotationTimers = [];
+var TRAIN_ROTATION_LIMIT = 5;
+var TRAIN_ROTATION_HOLD_MS = 5000;
+var TRAIN_ROTATION_TRANSITION_MS = 600;
 var announcementEnabled = false;
 var announcementInterval = null;
 var stationMap = {};
@@ -201,80 +208,160 @@ async function loadSomeDisplay (stationId) {
     })
 }
 
+function getDisplayTrains() {
+    return lastTrainData.filter(train => !hiddenRoutes.has(train.route.charAt(0)) && !currentStationStops.includes(train.terminal.slice(0, -1)));
+}
+
+function clearTrainRotationTimers() {
+    trainRotationTimers.forEach(timer => clearTimeout(timer));
+    trainRotationTimers = [];
+}
+
+function scheduleTrainRotation() {
+    trainRotationTimers.push(setTimeout(rotateBottomTrain, Math.max(0, trainRotationNextAt - Date.now())));
+}
+
 function renderTrainRows() {
-    selectedNumber = parseInt(document.getElementById("noOfTrainsEntry").value);
-    let filteredTrains = lastTrainData.filter(train => !hiddenRoutes.has(train.route.charAt(0)) && !currentStationStops.includes(train.terminal.slice(0, -1)));
-    let currentDate = lastFetchTime || new Date();
+    // A refresh may replace the DOM during a transition. Cancel callbacks for old rows,
+    // but retain the rotation position and deadline across ordinary data refreshes.
+    clearTrainRotationTimers();
+    selectedNumber = Math.max(1, Math.min(9, parseInt(document.getElementById("noOfTrainsEntry").value) || 2));
+    const filteredTrains = getDisplayTrains();
+    const rotationCount = Math.min(TRAIN_ROTATION_LIMIT, filteredTrains.length);
+    const canRotate = selectedNumber < rotationCount;
+    const context = JSON.stringify([stationId, selectedNumber, displayVersion, [...hiddenRoutes].sort(), [...currentStationStops].sort()]);
 
-    document.getElementById("trainBlock").innerHTML = "";
-    for (let k = 1; k <= selectedNumber; k++) {
-        let trainrowDiv = document.createElement("div");
-        trainrowDiv.className = "trainrow " + displayVersion;
-        trainrowDiv.id = "trainrow" + k;
-
-        let numDiv = document.createElement("div");
-        numDiv.className = "num";
-        numDiv.id = "num" + k;
-        numDiv.textContent = displayVersion === 'v1' ? k + '.' : String(k);
-
-        let routeDiv = document.createElement("div");
-        routeDiv.className = "route";
-        routeDiv.id = "route" + k;
-
-        let routeTextDiv = document.createElement("div");
-        routeTextDiv.className = "routeText";
-        routeTextDiv.id = "routeText" + k;
-
-        routeDiv.appendChild(routeTextDiv);
-
-        let terminalDiv = document.createElement("div");
-        terminalDiv.className = "terminal";
-        terminalDiv.id = "terminal" + k;
-
-        let etaDiv = document.createElement("div");
-        etaDiv.className = "eta";
-        etaDiv.id = "eta" + k;
-
-        trainrowDiv.appendChild(numDiv);
-        trainrowDiv.appendChild(routeDiv);
-        trainrowDiv.appendChild(terminalDiv);
-        trainrowDiv.appendChild(etaDiv);
-        document.getElementById("trainBlock").appendChild(trainrowDiv);
-
-        if (filteredTrains.length >= k) {
-            let train = filteredTrains[k - 1];
-            routeTextDiv.textContent = train.route.charAt(0);
-
-            if (displayVersion === 'v2') {
-                renderV2Destination(terminalDiv, train);
-            } else {
-                terminalDiv.textContent = train.terminalName;
-            }
-
-            let etaString = train.time;
-            let eta = new Date(etaString);
-            let etaMinutes = timeDifference(currentDate, eta);
-            etaDiv.dataset.minutes = etaMinutes;
-            if (displayVersion === 'v2') {
-                etaDiv.innerHTML = '<span class="eta-number"></span><span class="eta-unit">MIN</span>';
-                etaDiv.querySelector('.eta-number').textContent = etaMinutes;
-            } else {
-                etaDiv.textContent = etaMinutes + ' Min';
-            }
-
-            if (train.route.slice(-1) == "X") {
-                routeDiv.classList.remove('circle');
-                routeDiv.classList.add('diamond');
-            } else {
-                routeDiv.classList.remove('diamond');
-                routeDiv.classList.add('circle');
-            }
-        } else {
-            routeTextDiv.innerHTML = "";
-            terminalDiv.innerHTML = "No scheduled";
-            etaDiv.innerHTML = "";
-        }
+    if (context !== trainRotationContext || trainRotationIndex < selectedNumber - 1 || trainRotationIndex >= rotationCount) {
+        trainRotationIndex = selectedNumber - 1;
+        trainRotationNextAt = 0;
     }
+    trainRotationContext = context;
+    if (!canRotate) {
+        trainRotationIndex = selectedNumber - 1;
+        trainRotationNextAt = 0;
+    } else if (!trainRotationNextAt) {
+        trainRotationNextAt = Date.now() + TRAIN_ROTATION_HOLD_MS;
+    }
+
+    const board = document.getElementById("trainBlock");
+    board.innerHTML = "";
+    for (let slot = 1; slot <= selectedNumber; slot++) {
+        const rotating = canRotate && slot === selectedNumber;
+        const trainIndex = rotating ? trainRotationIndex : slot - 1;
+        const row = createTrainRow(slot, trainIndex + 1, filteredTrains[trainIndex]);
+        if (rotating) {
+            row.classList.add('rotating-row');
+            row.style.setProperty('--rotation-duration', TRAIN_ROTATION_TRANSITION_MS + 'ms');
+            const number = row.children[0];
+            number.textContent = '';
+            number.setAttribute('aria-label', 'Train ' + (trainIndex + 1));
+            const track = document.createElement('div');
+            track.className = 'rotation-number-track';
+            track.setAttribute('aria-hidden', 'true');
+            for (let position = 1; position <= rotationCount; position++) {
+                const value = document.createElement('div');
+                value.className = 'rotation-number';
+                value.textContent = displayVersion === 'v1' ? position + '.' : String(position);
+                track.appendChild(value);
+            }
+            track.style.transform = `translateY(-${trainIndex * 100}%)`;
+            number.appendChild(track);
+        }
+        board.appendChild(row);
+    }
+    if (canRotate) scheduleTrainRotation();
+}
+
+function createTrainRow(slot, position, train) {
+    const row = document.createElement('div');
+    row.className = 'trainrow ' + displayVersion;
+    row.id = 'trainrow' + slot;
+    for (const className of ['num', 'route', 'terminal', 'eta']) {
+        const element = document.createElement('div');
+        element.className = className;
+        element.id = className + slot;
+        row.appendChild(element);
+    }
+    row.children[0].textContent = displayVersion === 'v1' ? position + '.' : String(position);
+    const routeText = document.createElement('div');
+    routeText.className = 'routeText';
+    routeText.id = 'routeText' + slot;
+    row.children[1].appendChild(routeText);
+    populateTrainRow(row, train);
+    return row;
+}
+
+function populateTrainRow(row, train) {
+    const [, route, terminal, eta] = row.children;
+    const routeText = route.children[0];
+    terminal.textContent = '';
+    route.classList.remove('circle', 'diamond');
+    if (!train) {
+        routeText.textContent = '';
+        terminal.textContent = 'No scheduled';
+        eta.textContent = '';
+        delete eta.dataset.minutes;
+        return;
+    }
+
+    routeText.textContent = train.route.charAt(0);
+    route.classList.add(train.route.endsWith('X') ? 'diamond' : 'circle');
+    if (displayVersion === 'v2') {
+        renderV2Destination(terminal, train);
+    } else {
+        terminal.textContent = train.terminalName;
+    }
+    const minutes = timeDifference(lastFetchTime || new Date(), new Date(train.time));
+    eta.dataset.minutes = minutes;
+    if (displayVersion === 'v2') {
+        eta.innerHTML = '<span class="eta-number"></span><span class="eta-unit">MIN</span>';
+        eta.querySelector('.eta-number').textContent = minutes;
+    } else {
+        eta.textContent = minutes + ' Min';
+    }
+}
+
+function rotateBottomTrain() {
+    clearTrainRotationTimers();
+    const filteredTrains = getDisplayTrains();
+    const rotationCount = Math.min(TRAIN_ROTATION_LIMIT, filteredTrains.length);
+    const row = document.getElementById('trainrow' + selectedNumber);
+    if (selectedNumber >= rotationCount || !row || !row.classList.contains('rotating-row')) {
+        renderTrainRows();
+        arrivalUpdate();
+        routeUpdate();
+        return;
+    }
+    if (document.hidden) {
+        trainRotationNextAt = Date.now() + TRAIN_ROTATION_HOLD_MS;
+        scheduleTrainRotation();
+        return;
+    }
+
+    trainRotationIndex = trainRotationIndex + 1 < rotationCount ? trainRotationIndex + 1 : selectedNumber - 1;
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const duration = reduceMotion ? 0 : TRAIN_ROTATION_TRANSITION_MS;
+    trainRotationNextAt = Date.now() + duration + TRAIN_ROTATION_HOLD_MS;
+    row.querySelector('.rotation-number-track').style.transform = `translateY(-${trainRotationIndex * 100}%)`;
+    row.classList.add('rotation-out');
+
+    const swap = () => {
+        populateTrainRow(row, filteredTrains[trainRotationIndex]);
+        row.children[0].setAttribute('aria-label', 'Train ' + (trainRotationIndex + 1));
+        updateTrainArrival(row);
+        updateRouteColor(row.children[1]);
+        row.classList.remove('rotation-out');
+    };
+    if (reduceMotion) swap();
+    else trainRotationTimers.push(setTimeout(swap, duration / 2));
+    scheduleTrainRotation();
+}
+
+function updateTrainCount() {
+    renderTrainRows();
+    arrivalUpdate();
+    routeUpdate();
+    saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
 }
 
 function getV2DirectionLabel(train) {
@@ -347,28 +434,31 @@ function runJob() {
 }
 
 function arrivalUpdate () {
-    let trainrowElements = document.querySelectorAll('.trainrow');
-    trainrowElements.forEach(function(trainrowElement) {
-        let etaElement = trainrowElement.querySelector('.eta');
-        var etaValue = etaElement.dataset.minutes || etaElement.innerText.split(' ')[0];
-        trainrowElement.classList.remove('arrivalyellow', 'arrival-invert');
-        etaElement.classList.remove('blink');
+    document.querySelectorAll('.trainrow').forEach(updateTrainArrival);
+}
 
-        if (etaValue === '0') {
-            if (displayVersion === 'v2') {
-                trainrowElement.classList.add('arrival-invert');
-            } else {
-                trainrowElement.classList.add('arrivalyellow');
-                etaElement.classList.add('blink');
-            }
+function updateTrainArrival(trainrowElement) {
+    let etaElement = trainrowElement.querySelector('.eta');
+    var etaValue = etaElement.dataset.minutes || etaElement.innerText.split(' ')[0];
+    trainrowElement.classList.remove('arrivalyellow', 'arrival-invert');
+    etaElement.classList.remove('blink');
+
+    if (etaValue === '0') {
+        if (displayVersion === 'v2') {
+            trainrowElement.classList.add('arrival-invert');
+        } else {
+            trainrowElement.classList.add('arrivalyellow');
+            etaElement.classList.add('blink');
         }
-    })
-
-}   
+    }
+}
 
 function routeUpdate () {
-    let routeElements = document.querySelectorAll('.route');
-    routeElements.forEach(function(routeElement) {
+    document.querySelectorAll('.route').forEach(updateRouteColor);
+    errorCount = 0;
+}
+
+function updateRouteColor(routeElement) {
     let routeValue = routeElement.innerText.charAt(0); 
     let routeBackgroundColor = routeBackgroundColors[routeValue] || '#808183';
     if (!routeValue) {
@@ -382,8 +472,6 @@ function routeUpdate () {
     
     routeElement.style.backgroundColor = `${routeBackgroundColor}`;
     routeElement.style.color = `${routeTextColor}`;
-    })
-    errorCount = 0;
 }
 
 function toggleRouteFilter(routeLetter) {

@@ -81,8 +81,16 @@ input, select {
   opacity: 0.4;
 }
 
+#allRoutes .route.diamond {
+  /* Use the rotated diamond's visible width, rather than its square side. */
+  font-size: calc(4.7vw * 1.414214 * var(--route-text-ratio));
+}
+
 #allRoutes {
-  font-size: 3.75vw;
+  /* Match v2 arrival badges: text size / visible badge width. */
+  --route-text-ratio: calc(5.8594 / 8.9844);
+  font-size: calc(6vw * var(--route-text-ratio));
+  line-height: 1;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(5.75vw, 1fr));
   grid-template-rows: 6vw;
@@ -329,6 +337,52 @@ input, select {
 
 .trainrow > .service{
   display: none;
+}
+
+/* Keep the number strip spatially ordered; its transform reverses on wraparound. */
+.trainrow.rotating-row > .num {
+  align-self: stretch;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.trainrow.v1.rotating-row > .num {
+  /* Include v1's trailing period inside the clip without moving the badge. */
+  margin-right: -1vw;
+}
+
+.rotation-number-track {
+  height: 100%;
+  transition: transform var(--rotation-duration) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rotation-number {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.trainrow.rotating-row > .route,
+.trainrow.rotating-row > .terminal,
+.trainrow.rotating-row > .eta {
+  /* A separate fade channel preserves v1's arriving-time opacity animation. */
+  filter: opacity(1);
+  transition: filter calc(var(--rotation-duration) / 2) ease-in-out;
+}
+
+.trainrow.rotation-out > .route,
+.trainrow.rotation-out > .terminal,
+.trainrow.rotation-out > .eta {
+  filter: opacity(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotation-number-track,
+  .trainrow.rotating-row > .route,
+  .trainrow.rotating-row > .terminal,
+  .trainrow.rotating-row > .eta {
+    transition: none;
+  }
 }
 
 .misc {

@@ -14,8 +14,21 @@
 <h1>v1 / Original display</h1>
 <div class="block"><div class="train" id="v1"></div></div>
 <h1>v2 / After proportions</h1>
-<div class="block"><div class="train" id="v2"></div></div>
-<p>Offline preview: includes single/two-line destinations, descenders, a diamond, two-digit minutes, and an arriving row. No audio or live data.</p>
+<div class="block">
+  <div class="station" id="stationBlock">
+    <div id="stationName">Times Sq-42 St Station</div>
+    <div id="allRoutes">
+      <div class="route circle"><div class="routeText">1</div></div>
+      <div class="route circle"><div class="routeText">3</div></div>
+      <div class="route diamond"><div class="routeText">7</div></div>
+      <div class="route circle"><div class="routeText">R</div></div>
+      <div class="route circle"><div class="routeText">W</div></div>
+      <div class="route diamond dimmed"><div class="routeText">F</div></div>
+    </div>
+  </div>
+  <div class="train" id="v2"></div>
+</div>
+<p>Offline preview: includes station route badges, single/two-line destinations, descenders, diamonds, two-digit minutes, and an arriving row. No audio or live data.</p>
 <script>
   const examples = [
     ['1', 'Downtown', 'South Ferry', 2],

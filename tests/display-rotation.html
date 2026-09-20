@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Train rotation preview</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { background: #171717; color: white; }
+  .controls { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 4vw; }
+  .controls label, .controls select, .controls button { font-size: 1rem; }
+  .block { margin-top: 2rem; margin-bottom: 2rem; }
+  p { margin: 1rem 4vw; }
+  .footer { display: none; }
+</style>
+<div class="controls">
+  <label>Rows <select id="noOfTrainsEntry" onchange="updateTrainCount()">
+    <option>1</option><option selected>2</option><option>3</option><option>4</option>
+    <option>5</option><option>6</option><option>7</option><option>8</option><option>9</option>
+  </select></label>
+  <label>Display <select id="displayVersion" onchange="updateDisplayVersion()">
+    <option>v1</option><option selected>v2</option>
+  </select></label>
+  <label>Available trains <select id="available" onchange="loadPreviewTrains()">
+    <option>0</option><option>1</option><option>2</option><option>3</option>
+    <option>4</option><option>5</option><option selected>6</option>
+  </select></label>
+  <label>Motion <select onchange="TRAIN_ROTATION_TRANSITION_MS = Number(this.value); refreshPreview()">
+    <option value="600">Normal</option><option value="6000">Slow inspection</option>
+  </select></label>
+  <button onclick="rotateBottomTrain()">Next rotation</button>
+  <button onclick="refreshPreview()">Simulate data refresh</button>
+  <button onclick="toggleRouteFilter('R')">Toggle R filter</button>
+</div>
+<div class="block">
+  <div class="station" id="stationBlock">
+    <div id="stationName">Rotation preview</div>
+    <div id="allRoutes"></div>
+  </div>
+  <div class="train" id="trainBlock"></div>
+</div>
+<p>Uses the real board renderer and timers with local sample data. The bottom row holds for five seconds, then rotates over 0.6 seconds. Five or more rows stay fixed.</p>
+<p>Try rows 1–4, the return from train 5, changing the available train count, and refreshing during a fade. The fixed rows should stay still.</p>
+<div class="footer"><select id="routeSelect"></select><select id="stopSelect"></select></div>
+<script>
+  // Hold automatic startup: no live API, audio downloads, or saved preferences.
+  window.fetch = () => new Promise(() => {});
+</script>
+<script src="../javascript.js"></script>
+<script>
+  saveUserSettings = () => {};
+  const previewTime = new Date();
+  const previewTrains = [
+    ['N', 'Downtown', 'Coney Island-Stillwell Av', 0],
+    ['R', 'Downtown', 'Bay Ridge-95 St', 7],
+    ['7X', 'Flushing-Main St', 'Flushing-Main St', 11],
+    ['Q', 'Uptown', '96 St', 12],
+    ['F', 'Queens', 'Jamaica-179 St', 15],
+    ['W', 'Queens', 'Astoria-Ditmars Blvd', 18]
+  ].map(([route, directionLabel, terminalName, minutes]) => ({
+    route, directionLabel, terminalName, terminal: 'previewN',
+    time: new Date(previewTime.getTime() + minutes * 60000).toISOString()
+  }));
+  function refreshPreview() {
+    renderTrainRows();
+    arrivalUpdate();
+    routeUpdate();
+  }
+  function loadPreviewTrains() {
+    lastFetchTime = previewTime;
+    lastTrainData = previewTrains.slice(0, Number(document.getElementById('available').value));
+    refreshPreview();
+  }
+  loadPreviewTrains();
+</script>
+</html>
