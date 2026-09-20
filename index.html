@@ -19,6 +19,10 @@
                 <div id="stationName"></div>
                 <div id="allRoutes"></div>
             </div>
+            <header class="board-header" id="boardHeader" hidden>
+                <img class="board-logo" src="icons/mta-logo.svg" alt="MTA">
+                <time class="board-clock" id="boardClock"><span class="board-clock-main" id="boardClockMain"></span><span class="board-clock-seconds" id="boardClockSeconds"></span></time>
+            </header>
             <div class="train" id="trainBlock">
                 <!--
                 <div class="trainrow">
@@ -96,6 +100,10 @@
                     <span>
                         <label for="toggleServiceAlerts">Display service alerts:</label>
                         <input type="checkbox" id="toggleServiceAlerts" onchange="toggleServiceAlerts()" checked>
+                    </span>
+                    <span>
+                        <label for="toggleBackgroundImage">Background image:</label>
+                        <input type="checkbox" id="toggleBackgroundImage" onchange="toggleBackgroundImage()" checked>
                     </span>
                     <span>
                         <label for="toggleAnnouncement">Voice Announcement:</label>

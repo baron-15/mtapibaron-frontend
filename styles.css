@@ -3,16 +3,45 @@ html {
   min-width: 100%;
 }
 
+:root {
+  /* Route bullet glyph size / visible bullet diameter. Reference bullets: 'B' 0.74, '3' 0.75, '1' 0.67. */
+  --route-glyph-ratio: 0.72;
+}
+
+/* Route bullets share one face and one optical centering everywhere they appear. */
+.route,
+.alert-route-badge,
+.alert-station-symbol {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.routeText {
+  /* Helvetica Neue's ascent sets figures below the box center by this much. */
+  position: relative;
+  top: -0.025em;
+}
+
+.routeText[data-glyph="1"] {
+  /* The flagged "1" is left-heavy in its advance; the reference bullets center it optically. */
+  left: 0.045em;
+}
+
 body {
     font-family: Arial, Helvetica, sans-serif;
     margin: 0;
     width: 100%;
     height: 100%;
-    background-color: #222222;
-    background: url("nysdBackground.jpg");
+    background-color: #000000;
+    /* Photo at 50% over pure black: a half-black layer over the image is the same blend. */
+    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("nysdBackground.jpg");
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
+}
+
+body.no-background-image {
+    background-image: none;
 }
 
 a:link {
@@ -83,13 +112,11 @@ input, select {
 
 #allRoutes .route.diamond {
   /* Use the rotated diamond's visible width, rather than its square side. */
-  font-size: calc(4.7vw * 1.414214 * var(--route-text-ratio));
+  font-size: calc(4.7vw * 1.414214 * var(--route-glyph-ratio));
 }
 
 #allRoutes {
-  /* Match v2 arrival badges: text size / visible badge width. */
-  --route-text-ratio: calc(5.8594 / 8.9844);
-  font-size: calc(6vw * var(--route-text-ratio));
+  font-size: calc(6vw * var(--route-glyph-ratio));
   line-height: 1;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(5.75vw, 1fr));
@@ -114,6 +141,37 @@ input, select {
   color: white;
   padding: 1.5vw;
 }
+
+/* Logo and NYC clock: stands in for the station block when that is switched off. */
+.board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ffffff;
+  /* Same side padding as .train, so 1cqw here equals 1cqw in the rows. */
+  padding: 1.5vw 1.5vw 0;
+  container-type: inline-size;
+}
+
+.board-header[hidden] { display: none; }
+
+.board-logo {
+  display: block;
+  /* Reference: logo diameter 4.7% of the row width, at the board's 0.81 row scale. */
+  width: calc(4.7cqw * 0.81);
+  height: calc(4.7cqw * 0.81);
+}
+
+.board-clock {
+  /* Reference: digits ~6.6% of the row width (taller than the destination text); the line box sets the header's height. */
+  font-size: calc(6.6cqw * 0.81);
+  line-height: 1.4;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.board-clock-seconds { font-weight: 400; }
 
 .train {
     display: grid;
@@ -187,7 +245,9 @@ input, select {
 }
 .route.diamond > .routeText {
   display: table-cell;
-  transform: rotate(-45deg);
+  /* The centering nudge rides inside the counter-rotation so it stays vertical on screen. */
+  top: 0;
+  transform: rotate(-45deg) translateY(-0.025em);
   vertical-align: middle;
   height: 4.75vw;
   width: 4.75vw;
@@ -205,7 +265,7 @@ input, select {
   justify-self: center;
   width: var(--badge-size);
   height: var(--badge-size);
-  font-size: calc(5.8594cqw * var(--row-scale));
+  font-size: calc(var(--badge-size) * var(--route-glyph-ratio));
   line-height: 1;
 }
 
@@ -228,6 +288,9 @@ input, select {
 }
 
 .trainrow.v2 {
+  /* Reference rows are Helvetica Neue; macOS's default smoothing fattens light-on-dark text, so use antialiased. */
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
   --row-background: #222222;
   /* Shrink row contents together while retaining the board's horizontal gaps. */
   --row-scale: 0.81;
@@ -239,7 +302,8 @@ input, select {
   isolation: isolate;
   background-color: transparent;
   box-shadow: none;
-  padding: 0 2.3438cqw 0 0;
+  /* 20px right inset in the 2048px reference: puts the countdown's center 6.3% of the row from the edge, as on the reference board. */
+  padding: 0 0.9766cqw 0 0;
   column-gap: 0.8789cqw;
   grid-template-columns: 5.6641cqw var(--badge-size) minmax(0, 1fr) 10cqw;
   /* Fixed tracks keep one- and two-line destinations the same height. */
@@ -260,7 +324,8 @@ input, select {
 }
 
 .trainrow.v2 > .num {
-  color: #ffffff;
+  /* Same off-white as the MIN unit, as on the reference board. */
+  color: #c0c0c2;
   font-size: calc(5.2734cqw * var(--row-scale));
   font-weight: 700;
   padding-left: 0.293cqw;
@@ -299,14 +364,21 @@ input, select {
   font-size: calc(5.8594cqw * var(--row-scale));
 }
 
-.trainrow.v2 .terminal-primary,
-.trainrow.v2 .eta-number {
-  font-weight: 600;
+.trainrow.v2 .terminal-primary {
+  font-weight: 700;
+  /* Reference "Downtown" is 2.9% narrower than Helvetica Neue Bold's default tracking. */
+  letter-spacing: -0.02em;
+}
+
+.trainrow.v2 .terminal-secondary {
+  /* Reference secondary line is Helvetica Neue Medium (falls back to normal without it). */
+  font-weight: 500;
 }
 
 .terminal-secondary {
   margin-top: 0;
-  font-size: calc(2.7344cqw * var(--row-scale));
+  /* Reference: secondary cap height is 0.475 of the primary's. */
+  font-size: calc(2.63cqw * var(--row-scale));
   font-weight: normal;
 }
 
@@ -325,13 +397,16 @@ input, select {
 
 .trainrow.v2 .eta-number {
   font-size: calc(8.2031cqw * var(--row-scale));
+  font-weight: 700;
 }
 
 .trainrow.v2 .eta-unit {
   margin-top: 0;
   font-size: calc(1.5625cqw * var(--row-scale));
   font-weight: 700;
-  letter-spacing: 0.08em;
+  /* Reference: letter gaps are 0.31 of the cap height, sampled fill #c0c0c2. */
+  letter-spacing: 0.09em;
+  color: #c0c0c2;
 }
 
 .trainrow > .service{
@@ -458,6 +533,8 @@ input, select {
   padding: 2vw 0;
   font-size: clamp(16px, 2.25vw, 48px);
   line-height: 1.3;
+  /* Meta bullet diameter: reference is 1.86x the heading text. */
+  --meta-badge: 1.84em;
 }
 
 .alert-meta {
@@ -472,9 +549,11 @@ input, select {
   flex-wrap: wrap;
   gap: 0.35em;
   position: relative;
-  max-width: 8vw;
+  /* Two bullets per row, then wrap. */
+  max-width: calc(2 * var(--meta-badge) + 0.35em);
   flex: 0 0 auto;
-  padding-bottom: 0.3em;
+  /* Room for the warning symbol, which hangs 19% below the bullet. */
+  padding-bottom: calc(0.19 * var(--meta-badge));
 }
 
 .alert-route-badge,
@@ -482,24 +561,30 @@ input, select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.53em;
-  height: 1.53em;
+  font-size: calc(var(--meta-badge) * var(--route-glyph-ratio));
+  /* em here is the glyph size, so the box is the full bullet diameter. */
+  width: calc(1em / var(--route-glyph-ratio));
+  height: calc(1em / var(--route-glyph-ratio));
   border-radius: 50%;
-  font-size: 1em;
   font-weight: 700;
   line-height: 1;
   flex: 0 0 auto;
   vertical-align: -0.15em;
 }
 
-.alert-route-wide { font-size: 0.75em; width: 2.04em; height: 2.04em; }
+.alert-route-wide {
+  /* Three-letter routes: smaller glyph, same diameter. */
+  font-size: calc(var(--meta-badge) * var(--route-glyph-ratio) * 0.75);
+  width: calc(1em / var(--route-glyph-ratio) / 0.75);
+  height: calc(1em / var(--route-glyph-ratio) / 0.75);
+}
 .alert-station-symbol { background: #777777; }
 
 .alert-badge-anchor {
   display: inline-flex;
   position: relative;
-  width: 1.53em;
-  height: 1.53em;
+  width: var(--meta-badge);
+  height: var(--meta-badge);
   flex: 0 0 auto;
 }
 
@@ -516,16 +601,18 @@ input, select {
 .alert-warning-planned { background-image: url("icons/service-planned-work.svg"); }
 .alert-warning-delay { background-image: url("icons/service-delay.svg"); }
 
-.alert-type { font-size: 1em; line-height: 1.2; margin: 0 0 0.2em; }
-.alert-timing { margin: 0; font-size: 0.9em; color: #dddddd; }
+.alert-type { font-size: 1em; line-height: 1.2; margin: 0 0 0.1em; }
+.alert-timing { margin: 0; font-size: 0.9em; line-height: 1.2; color: #dddddd; }
 .alert-message { margin: 0; overflow-wrap: anywhere; }
 .alert-message .alert-route-badge {
-  font-size: 0.75em;
+  /* Reference: inline bullets are 1.136x the message text; the glyph keeps the shared ratio. */
+  font-size: calc(1.136em * var(--route-glyph-ratio));
   vertical-align: middle;
   position: relative;
+  /* Center on the cap height rather than the x-height. */
   top: -0.08em;
 }
-.alert-message .alert-route-wide { font-size: 0.56em; }
+.alert-message .alert-route-wide { font-size: calc(1.136em * var(--route-glyph-ratio) * 0.75); }
 
 .service-alerts-status {
   border-top: max(1px, 0.18vw) solid #777777;

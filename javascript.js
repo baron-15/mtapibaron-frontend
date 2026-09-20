@@ -4,6 +4,7 @@ var errorCount = 0;
 var selectedNumber = 2;
 var displayStationBlock = 0;
 var displayServiceAlerts = true;
+var displayBackgroundImage = true;
 var currentServiceAlerts = null;
 var displayVersion = 'v2';
 var stationData = [];
@@ -188,6 +189,7 @@ async function loadSomeDisplay (stationId) {
             routeTextBlock.className = "routeText";
             routeTextBlock.id = "routeText" + k;
             routeTextBlock.innerHTML = rawRoutes[k - 1].charAt(0);
+            routeTextBlock.dataset.glyph = rawRoutes[k - 1].charAt(0);
             routeBlock.appendChild(routeTextBlock);
             if (rawRoutes[k-1].slice(-1) == "X")
                 {
@@ -304,6 +306,7 @@ function populateTrainRow(row, train) {
     route.classList.remove('circle', 'diamond');
     if (!train) {
         routeText.textContent = '';
+        delete routeText.dataset.glyph;
         terminal.textContent = 'No scheduled';
         eta.textContent = '';
         delete eta.dataset.minutes;
@@ -311,6 +314,7 @@ function populateTrainRow(row, train) {
     }
 
     routeText.textContent = train.route.charAt(0);
+    routeText.dataset.glyph = train.route.charAt(0);
     route.classList.add(train.route.endsWith('X') ? 'diamond' : 'circle');
     if (displayVersion === 'v2') {
         renderV2Destination(terminal, train);
@@ -529,6 +533,17 @@ function toggleServiceAlerts() {
     displayServiceAlerts = document.getElementById('toggleServiceAlerts').checked;
     if (window.ServiceAlerts) window.ServiceAlerts.setEnabled(displayServiceAlerts);
     saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
+}
+
+function toggleBackgroundImage() {
+    displayBackgroundImage = document.getElementById('toggleBackgroundImage').checked;
+    applyBackgroundImage(displayBackgroundImage);
+    saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
+}
+
+function applyBackgroundImage(visible) {
+    document.getElementById('toggleBackgroundImage').checked = visible;
+    if (document.body) document.body.classList.toggle('no-background-image', !visible);
 }
 
 function toOrdinal(n) {
@@ -1065,7 +1080,8 @@ function saveUserSettings(cS, pS, sN, sB) {
         cookieSelectedNo: sN,
         cookieDisplayStationBlock:sB,
         cookieDisplayVersion: displayVersion,
-        cookieDisplayServiceAlerts: displayServiceAlerts
+        cookieDisplayServiceAlerts: displayServiceAlerts,
+        cookieDisplayBackgroundImage: displayBackgroundImage
     };
 
     var userSettingsJSON = JSON.stringify(userSettings);
@@ -1089,15 +1105,9 @@ function getUserSettings() {
         displayServiceAlerts = userSettings.cookieDisplayServiceAlerts !== false;
         document.getElementById('toggleServiceAlerts').checked = displayServiceAlerts;
         if (window.ServiceAlerts) window.ServiceAlerts.setEnabled(displayServiceAlerts);
-        let stationBlock = document.getElementById("stationBlock");
-        let checkbox = document.getElementById("toggleStationBlock");
-        if (displayStationBlock) {
-            stationBlock.style.display = "grid";
-            checkbox.checked = true;
-          } else {
-            stationBlock.style.display = "none";
-            checkbox.checked = false;
-          }
+        displayBackgroundImage = userSettings.cookieDisplayBackgroundImage !== false;
+        applyBackgroundImage(displayBackgroundImage);
+        applyStationBlockDisplay(Boolean(displayStationBlock));
         editSelectedNumber.value = selectedNumber;
         document.getElementById('displayVersion').value = displayVersion;
         console.log("Cookie found!", stationId, ", ", previousStationId, ", ", selectedNumber, ",", displayStationBlock);
@@ -1113,18 +1123,48 @@ function updateDisplayVersion() {
 }
 
 function toggleStationBlock() {
-    let stationBlock = document.getElementById("stationBlock");
     let checkbox = document.getElementById("toggleStationBlock");
-
-    if (checkbox.checked) {
-      stationBlock.style.display = "grid";
-      displayStationBlock = 1;
-    } else {
-      stationBlock.style.display = "none";
-      displayStationBlock = 0;
-    }
+    displayStationBlock = checkbox.checked ? 1 : 0;
+    applyStationBlockDisplay(checkbox.checked);
     saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
   }
+
+// The station block and the logo/clock header take turns at the top of the board.
+function applyStationBlockDisplay(visible) {
+    let stationBlock = document.getElementById("stationBlock");
+    let checkbox = document.getElementById("toggleStationBlock");
+    let header = document.getElementById("boardHeader");
+    stationBlock.style.display = visible ? "grid" : "none";
+    checkbox.checked = visible;
+    if (!header) return;
+    header.hidden = visible;
+    if (visible) stopBoardClock();
+    else startBoardClock();
+}
+
+let boardClockTimer = null;
+const boardClockFormat = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true
+});
+
+function startBoardClock() {
+    if (boardClockTimer !== null) return;
+    const tick = () => {
+        const parts = {};
+        boardClockFormat.formatToParts(new Date()).forEach(part => { parts[part.type] = part.value; });
+        document.getElementById("boardClockMain").textContent = parts.hour + ':' + parts.minute;
+        document.getElementById("boardClockSeconds").textContent = ':' + parts.second;
+        // Wake just after the next second boundary, so the display never skips a second.
+        boardClockTimer = setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+    };
+    tick();
+}
+
+function stopBoardClock() {
+    if (boardClockTimer === null) return;
+    clearTimeout(boardClockTimer);
+    boardClockTimer = null;
+}
 
 function loadURLandSetStationId() {
     /* let currentURL = window.location.href;

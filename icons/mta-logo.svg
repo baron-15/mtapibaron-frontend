@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="MTA">
+  <circle cx="50" cy="50" r="50" fill="#ffffff"/>
+  <text x="50" y="67" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="48" fill="#000000" textLength="80" lengthAdjust="spacingAndGlyphs" transform="translate(50 67) skewX(-9) translate(-50 -67)">MTA</text>
+</svg>

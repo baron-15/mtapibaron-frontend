@@ -136,7 +136,7 @@ test('the footer preference is saved, restored, and defaults on for older cookie
     const app = vm.createContext({
         console: { log() {} }, navigator: { userAgent: 'Test' }, document,
         window: { addEventListener() {}, ServiceAlerts: { setEnabled: value => enabled.push(value) } },
-        fetch: () => new Promise(() => {})
+        fetch: () => new Promise(() => {}), setTimeout: () => 0, clearTimeout() {}
     });
     vm.runInContext(source, app);
     element('toggleServiceAlerts').checked = false;
@@ -155,6 +155,21 @@ test('the footer preference is saved, restored, and defaults on for older cookie
     assert.equal(app.displayServiceAlerts, true);
     assert.equal(element('toggleServiceAlerts').checked, true);
     assert.equal(enabled.at(-1), true);
+    // The background image preference follows the same pattern, including the default for older cookies.
+    assert.equal(app.displayBackgroundImage, true);
+    element('toggleBackgroundImage').checked = false;
+    app.toggleBackgroundImage();
+    const saved = JSON.parse(decodeURIComponent(document.cookie.split(';')[0].split('=')[1]));
+    assert.equal(saved.cookieDisplayBackgroundImage, false);
+    app.displayBackgroundImage = true;
+    app.getUserSettings();
+    assert.equal(app.displayBackgroundImage, false);
+    assert.equal(element('toggleBackgroundImage').checked, false);
+    delete saved.cookieDisplayBackgroundImage;
+    document.cookie = 'userSettings=' + encodeURIComponent(JSON.stringify(saved));
+    app.getUserSettings();
+    assert.equal(app.displayBackgroundImage, true);
+    assert.equal(element('toggleBackgroundImage').checked, true);
 });
 
 test('the station response supplies alerts without an additional fetch, and late station responses are ignored', async () => {

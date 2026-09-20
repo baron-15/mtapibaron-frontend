@@ -57,7 +57,10 @@
         }
         function routeBadge(route) {
             const normalized = normalizeRoute(route);
-            const badge = element('span', 'alert-route-badge', normalized === 'SI' ? 'SIR' : ['FS', 'GS', 'H'].includes(normalized) ? 'S' : normalized);
+            const badge = element('span', 'alert-route-badge');
+            const glyph = element('span', 'routeText', normalized === 'SI' ? 'SIR' : ['FS', 'GS', 'H'].includes(normalized) ? 'S' : normalized);
+            glyph.setAttribute('data-glyph', glyph.textContent);
+            badge.appendChild(glyph);
             const colorRoute = ['FS', 'GS', 'H', 'SI'].includes(normalized) ? 'S' : normalized;
             badge.style.backgroundColor = root.routeBackgroundColors && root.routeBackgroundColors[colorRoute] || '#808183';
             badge.style.color = ['N', 'Q', 'R', 'W'].includes(normalized) ? '#000000' : '#ffffff';
@@ -90,7 +93,8 @@
                         const card = element('article', 'service-alert');
                         const meta = element('div', 'alert-meta');
                         const badges = element('div', 'alert-badges');
-                        const symbols = alert.routes.length ? alert.routes.map(routeBadge) : [element('span', 'alert-station-symbol', '!')];
+                        const stationSymbol = () => { const symbol = element('span', 'alert-station-symbol'); symbol.appendChild(element('span', 'routeText', '!')); return symbol; };
+                        const symbols = alert.routes.length ? alert.routes.map(routeBadge) : [stationSymbol()];
                         symbols.slice(0, -1).forEach(badge => badges.appendChild(badge));
                         const anchor = element('span', 'alert-badge-anchor');
                         anchor.appendChild(symbols[symbols.length - 1]);
