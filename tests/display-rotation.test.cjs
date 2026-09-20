@@ -129,7 +129,7 @@ for (const version of ['v1', 'v2']) {
             assert.equal(positionOf(bottom), rows);
             const positions = Array.from({ length: 5 - rows }, (_, index) => rows + index + 1).concat(rows);
             for (const position of positions) {
-                tick(5600);
+                tick(version === 'v1' ? 5000 : 5600);
                 assert.equal(positionOf(bottom), position);
                 assert.equal(routeOf(bottom), trains[position - 1].route.charAt(0));
                 assert.match(bottom.children[2].textContent, new RegExp('Destination ' + position));
@@ -162,6 +162,23 @@ for (const version of ['v1', 'v2']) {
         assert.ok(!bottom.children[3].classList.contains('blink'));
     });
 }
+
+test('v1 switches both number and details instantly every five seconds without animation markup', () => {
+    const { board, tick, timers } = loadBoard({ version: 'v1' });
+    const bottom = board.children[1];
+    assert.equal(bottom.querySelector('.rotation-number-track'), null);
+    tick(4999);
+    assert.equal(bottom.children[0].textContent, '2.');
+    assert.equal(routeOf(bottom), 'R');
+    tick(1);
+    assert.equal(bottom.children[0].textContent, '3.');
+    assert.equal(routeOf(bottom), '7');
+    assert.ok(!bottom.classList.contains('rotation-out'));
+    assert.equal(timers.size, 1, 'Only the next five-second hold should be scheduled');
+    tick(15000);
+    assert.equal(bottom.children[0].textContent, '2.');
+    assert.equal(routeOf(bottom), 'R');
+});
 
 test('the number moves up for increasing positions and down on wrap; content swaps halfway through the fade', () => {
     const { board, tick } = loadBoard();

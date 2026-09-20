@@ -340,15 +340,10 @@ input, select {
 }
 
 /* Keep the number strip spatially ordered; its transform reverses on wraparound. */
-.trainrow.rotating-row > .num {
+.trainrow.v2.rotating-row > .num {
   align-self: stretch;
   overflow: hidden;
   min-height: 0;
-}
-
-.trainrow.v1.rotating-row > .num {
-  /* Include v1's trailing period inside the clip without moving the badge. */
-  margin-right: -1vw;
 }
 
 .rotation-number-track {
@@ -362,25 +357,23 @@ input, select {
   align-items: center;
 }
 
-.trainrow.rotating-row > .route,
-.trainrow.rotating-row > .terminal,
-.trainrow.rotating-row > .eta {
-  /* A separate fade channel preserves v1's arriving-time opacity animation. */
-  filter: opacity(1);
-  transition: filter calc(var(--rotation-duration) / 2) ease-in-out;
+.trainrow.v2.rotating-row > .route,
+.trainrow.v2.rotating-row > .terminal,
+.trainrow.v2.rotating-row > .eta {
+  transition: opacity calc(var(--rotation-duration) / 2) ease-in-out;
 }
 
-.trainrow.rotation-out > .route,
-.trainrow.rotation-out > .terminal,
-.trainrow.rotation-out > .eta {
-  filter: opacity(0);
+.trainrow.v2.rotation-out > .route,
+.trainrow.v2.rotation-out > .terminal,
+.trainrow.v2.rotation-out > .eta {
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .rotation-number-track,
-  .trainrow.rotating-row > .route,
-  .trainrow.rotating-row > .terminal,
-  .trainrow.rotating-row > .eta {
+  .trainrow.v2.rotating-row > .route,
+  .trainrow.v2.rotating-row > .terminal,
+  .trainrow.v2.rotating-row > .eta {
     transition: none;
   }
 }
@@ -388,6 +381,156 @@ input, select {
 .misc {
     font-size: min(9pt, 2vw);
     color: #999999;
+}
+
+.service-alerts {
+  color: #ffffff;
+  padding: 2.5vw 2.25vw 2vw;
+}
+
+.service-alerts-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2vw;
+  margin-bottom: 1.4vw;
+}
+
+.service-alerts-heading h2 {
+  font-size: clamp(22px, 3.35vw, 72px);
+  line-height: 1.15;
+  margin: 0;
+}
+
+.service-alerts-links {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5vw;
+  font-size: clamp(12px, 1.65vw, 36px);
+  color: #aaaaaa;
+  text-align: right;
+}
+
+.service-alerts-links a {
+  color: #aaaaaa;
+  text-decoration: none;
+}
+
+.service-alerts-links a:hover,
+.service-alerts-links a:focus-visible { text-decoration: underline; }
+
+.service-alert-pages {
+  display: grid;
+  transition: opacity 300ms ease-in-out;
+}
+
+.service-alert-pages.alerts-fading { opacity: 0; }
+
+.alert-page {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  pointer-events: none;
+  /* Every page contributes to the height, so pairs do not shift the board. */
+}
+
+.alert-page.is-active {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.service-alert {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr);
+  column-gap: 3vw;
+  border-top: max(1px, 0.18vw) solid #777777;
+  padding: 2vw 0;
+  min-height: 9vw;
+  font-size: clamp(16px, 2.25vw, 48px);
+  line-height: 1.3;
+}
+
+.alert-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.1vw;
+  min-width: 0;
+}
+
+.alert-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  position: relative;
+  max-width: 8vw;
+  flex: 0 0 auto;
+  padding-bottom: 0.3em;
+}
+
+.alert-route-badge,
+.alert-station-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.53em;
+  height: 1.53em;
+  border-radius: 50%;
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1;
+  flex: 0 0 auto;
+  vertical-align: -0.15em;
+}
+
+.alert-route-wide { font-size: 0.75em; width: 2.04em; height: 2.04em; }
+.alert-station-symbol { background: #777777; }
+
+.alert-warning-symbol {
+  position: absolute;
+  right: -0.35em;
+  bottom: -0.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  border: 0.08em solid #000000;
+  border-radius: 50%;
+  background: #ffc400;
+  color: #000000;
+  font-weight: 700;
+  font-size: 0.5em;
+  line-height: 1;
+}
+
+.alert-type { font-size: 1em; line-height: 1.2; margin: 0 0 0.2em; }
+.alert-timing { margin: 0; font-size: 0.9em; color: #dddddd; }
+.alert-message { margin: 0; overflow-wrap: anywhere; }
+.alert-message .alert-route-badge {
+  font-size: 0.75em;
+  vertical-align: middle;
+  position: relative;
+  top: -0.08em;
+}
+.alert-message .alert-route-wide { font-size: 0.56em; }
+
+.service-alerts-status {
+  border-top: max(1px, 0.18vw) solid #777777;
+  padding-top: 1.5vw;
+  margin: 0 0 1.5vw;
+  color: #cccccc;
+  font-size: clamp(14px, 1.8vw, 38px);
+}
+
+@media (max-width: 600px) {
+  .service-alerts-heading { align-items: flex-start; }
+  .service-alerts-links { flex-direction: column; align-items: flex-end; gap: 0.4em; }
+  .service-alert { grid-template-columns: 1fr; gap: 0.85em; padding: 1em 0; }
+  .alert-badges { max-width: none; gap: 0.3em; }
+  .alert-meta { gap: 0.7em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-alert-pages { transition: none; }
 }
 
 .arrivalyellow {

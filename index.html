@@ -39,6 +39,17 @@
                 </div>
                 -->
             </div>
+            <section class="service-alerts" id="serviceAlertsBlock" aria-labelledby="serviceAlertsTitle">
+                <header class="service-alerts-heading">
+                    <h2 id="serviceAlertsTitle">Happening now</h2>
+                    <div class="service-alerts-links">
+                        <span id="serviceAlertsCounter"></span>
+                        <a href="https://www.mta.info/alerts" target="_blank" rel="noopener noreferrer">Visit mta.info for more</a>
+                    </div>
+                </header>
+                <p class="service-alerts-status" id="serviceAlertsStatus" role="status">Waiting for station arrivals…</p>
+                <div class="service-alert-pages" id="serviceAlertPages"></div>
+            </section>
             <div class = "footer">
                 <div class = "forms">
                     <span>
@@ -81,6 +92,10 @@
                         <input type="checkbox" id="toggleStationBlock" onchange="toggleStationBlock()" checked>
                     </span>
                     <span>
+                        <label for="toggleServiceAlerts">Display service alerts:</label>
+                        <input type="checkbox" id="toggleServiceAlerts" onchange="toggleServiceAlerts()" checked>
+                    </span>
+                    <span>
                         <label for="toggleAnnouncement">Voice Announcement:</label>
                         <input type="checkbox" id="toggleAnnouncement" onchange="toggleAnnouncement()">
                         <label for="announcementInterval">every</label>
@@ -94,6 +109,7 @@
 
                 <div class="misc" id="datetime">Time is coming</div>
             </div>
+            <script src="service-alerts.js"></script>
             <script src="javascript.js"></script>
         </div>
     </body>

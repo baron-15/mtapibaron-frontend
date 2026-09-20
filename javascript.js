@@ -3,6 +3,8 @@ var previousStationId = '640';
 var errorCount = 0;
 var selectedNumber = 2;
 var displayStationBlock = 0;
+var displayServiceAlerts = true;
+var currentApiBase = 'https://mtapibaron.onrender.com';
 var displayVersion = 'v2';
 var stationData = [];
 var hiddenRoutes = new Set();
@@ -75,6 +77,7 @@ async function loadSomeDisplay (stationId) {
     }
 
     let response;
+    let apiBase = 'https://mtapibaron.onrender.com';
     try {
         const controller = new AbortController();
         console.log('Trying primary API.');
@@ -83,6 +86,7 @@ async function loadSomeDisplay (stationId) {
         clearTimeout(timeoutId);
     } catch (e) {
         console.log("Primary API failed, falling back...", e.message);
+        apiBase = 'https://mta-api-project.uc.r.appspot.com';
         response = await fetch(BACKUP_URL);
     }
 
@@ -92,6 +96,7 @@ async function loadSomeDisplay (stationId) {
         let options = { timeZone: 'America/New_York' };
         let currentDateTimeET = currentDate.toLocaleString('en-US', options);
         lastTrainData = responseJson.data[0].alltrains;
+        currentApiBase = apiBase;
         currentStationStops = Object.keys(responseJson.data[0].stops);
         lastFetchTime = currentDate;
         renderTrainRows();
@@ -251,6 +256,8 @@ function renderTrainRows() {
         const row = createTrainRow(slot, trainIndex + 1, filteredTrains[trainIndex]);
         if (rotating) {
             row.classList.add('rotating-row');
+        }
+        if (rotating && displayVersion === 'v2') {
             row.style.setProperty('--rotation-duration', TRAIN_ROTATION_TRANSITION_MS + 'ms');
             const number = row.children[0];
             number.textContent = '';
@@ -261,7 +268,7 @@ function renderTrainRows() {
             for (let position = 1; position <= rotationCount; position++) {
                 const value = document.createElement('div');
                 value.className = 'rotation-number';
-                value.textContent = displayVersion === 'v1' ? position + '.' : String(position);
+                value.textContent = String(position);
                 track.appendChild(value);
             }
             track.style.transform = `translateY(-${trainIndex * 100}%)`;
@@ -340,20 +347,30 @@ function rotateBottomTrain() {
 
     trainRotationIndex = trainRotationIndex + 1 < rotationCount ? trainRotationIndex + 1 : selectedNumber - 1;
     const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const duration = reduceMotion ? 0 : TRAIN_ROTATION_TRANSITION_MS;
+    const animate = displayVersion === 'v2' && !reduceMotion;
+    const duration = animate ? TRAIN_ROTATION_TRANSITION_MS : 0;
     trainRotationNextAt = Date.now() + duration + TRAIN_ROTATION_HOLD_MS;
-    row.querySelector('.rotation-number-track').style.transform = `translateY(-${trainRotationIndex * 100}%)`;
-    row.classList.add('rotation-out');
+    if (displayVersion === 'v2') {
+        row.querySelector('.rotation-number-track').style.transform = `translateY(-${trainRotationIndex * 100}%)`;
+    }
 
     const swap = () => {
         populateTrainRow(row, filteredTrains[trainRotationIndex]);
-        row.children[0].setAttribute('aria-label', 'Train ' + (trainRotationIndex + 1));
+        if (displayVersion === 'v2') {
+            row.children[0].setAttribute('aria-label', 'Train ' + (trainRotationIndex + 1));
+        } else {
+            row.children[0].textContent = (trainRotationIndex + 1) + '.';
+        }
         updateTrainArrival(row);
         updateRouteColor(row.children[1]);
         row.classList.remove('rotation-out');
     };
-    if (reduceMotion) swap();
-    else trainRotationTimers.push(setTimeout(swap, duration / 2));
+    if (animate) {
+        row.classList.add('rotation-out');
+        trainRotationTimers.push(setTimeout(swap, duration / 2));
+    } else {
+        swap();
+    }
     scheduleTrainRotation();
 }
 
@@ -496,6 +513,24 @@ function applyRouteFilter() {
     renderTrainRows();
     arrivalUpdate();
     routeUpdate();
+    updateServiceAlertsContext();
+}
+
+function updateServiceAlertsContext() {
+    if (window.ServiceAlerts) {
+        window.ServiceAlerts.setContext({
+            stationId,
+            trains: getDisplayTrains(),
+            stopIds: currentStationStops,
+            apiBase: currentApiBase
+        });
+    }
+}
+
+function toggleServiceAlerts() {
+    displayServiceAlerts = document.getElementById('toggleServiceAlerts').checked;
+    if (window.ServiceAlerts) window.ServiceAlerts.setEnabled(displayServiceAlerts);
+    saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
 }
 
 function toOrdinal(n) {
@@ -1009,6 +1044,7 @@ function onStopChange() {
 
     hiddenRoutes.clear();
     stationId = selectedStopId;
+    if (window.ServiceAlerts) window.ServiceAlerts.setContext({ stationId, trains: [], stopIds: [] });
     runJobOnce();
     saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
 }
@@ -1029,7 +1065,8 @@ function saveUserSettings(cS, pS, sN, sB) {
         cookiePreviousStation: pS,
         cookieSelectedNo: sN,
         cookieDisplayStationBlock:sB,
-        cookieDisplayVersion: displayVersion
+        cookieDisplayVersion: displayVersion,
+        cookieDisplayServiceAlerts: displayServiceAlerts
     };
 
     var userSettingsJSON = JSON.stringify(userSettings);
@@ -1050,6 +1087,9 @@ function getUserSettings() {
         selectedNumber = userSettings.cookieSelectedNo;
         displayStationBlock = userSettings.cookieDisplayStationBlock;
         displayVersion = userSettings.cookieDisplayVersion === 'v1' ? 'v1' : 'v2';
+        displayServiceAlerts = userSettings.cookieDisplayServiceAlerts !== false;
+        document.getElementById('toggleServiceAlerts').checked = displayServiceAlerts;
+        if (window.ServiceAlerts) window.ServiceAlerts.setEnabled(displayServiceAlerts);
         let stationBlock = document.getElementById("stationBlock");
         let checkbox = document.getElementById("toggleStationBlock");
         if (displayStationBlock) {
