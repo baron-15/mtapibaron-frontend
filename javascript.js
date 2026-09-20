@@ -560,6 +560,45 @@ function setUpFullscreenButton() {
     label();
 }
 
+// Route bullet glyphs: measure each glyph's ink in the font the browser really renders and centre it in the
+// bullet. Offsets are per glyph and per font, so they survive fallback (Helvetica Neue on Apple, Roboto on Android).
+const ROUTE_GLYPHS = ['1', '2', '3', '4', '5', '6', '7', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'J', 'L', 'M', 'N', 'Q', 'R', 'S', 'W', 'Z', '!', 'SIR'];
+
+function centerRouteGlyphs() {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext && canvas.getContext('2d');
+    const probe = document.createElement('div');
+    if (!context || !document.body || !document.head) return;
+    probe.className = 'route circle';
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    document.body.appendChild(probe);
+    const style = getComputedStyle(probe);
+    const size = 100;
+    context.font = `${style.fontWeight} ${size}px ${style.fontFamily}`;
+    context.textBaseline = 'alphabetic';
+    context.textAlign = 'left';
+    probe.remove();
+    const rules = ROUTE_GLYPHS.map(glyph => {
+        const metrics = context.measureText(glyph);
+        if (metrics.fontBoundingBoxAscent === undefined) return '';
+        // The line box is 1em (line-height: 1) with the font's ascent+descent centred in it.
+        const baseline = (size - (metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent)) / 2 + metrics.fontBoundingBoxAscent;
+        const inkCenterY = baseline - (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;
+        const inkCenterX = (metrics.actualBoundingBoxRight - metrics.actualBoundingBoxLeft) / 2;
+        const dx = (metrics.width / 2 - inkCenterX) / size;
+        const dy = (size / 2 - inkCenterY) / size;
+        return `.routeText[data-glyph="${glyph}"] { --glyph-dx: ${dx.toFixed(4)}em; --glyph-dy: ${dy.toFixed(4)}em; }`;
+    });
+    let sheet = document.getElementById('routeGlyphOffsets');
+    if (!sheet) {
+        sheet = document.createElement('style');
+        sheet.id = 'routeGlyphOffsets';
+        document.head.appendChild(sheet);
+    }
+    sheet.textContent = rules.join('\n');
+}
+
 function applyBackgroundImage(visible) {
     document.getElementById('toggleBackgroundImage').checked = visible;
     if (document.body) document.body.classList.toggle('no-background-image', !visible);
@@ -1199,6 +1238,7 @@ function loadURLandSetStationId() {
 loadStationData().then(() => {
     return fetch(audioDir + '/station_map.json').then(r => r.json()).then(map => { stationMap = map; });
 }).then(() => {
+    centerRouteGlyphs();
     init();
     setUpFullscreenButton();
     getUserSettings();

@@ -17,14 +17,11 @@ html {
 }
 
 .routeText {
-  /* Helvetica Neue's ascent sets figures below the box center by this much. */
+  /* --glyph-dx/--glyph-dy are measured at startup (centerRouteGlyphs) from the glyph's real ink bounds in
+     whichever font the browser actually renders, so the ink is centred in the shape on every platform. */
   position: relative;
-  top: -0.025em;
-}
-
-.routeText[data-glyph="1"] {
-  /* The flagged "1" is left-heavy in its advance; the reference bullets center it optically. */
-  left: 0.045em;
+  line-height: 1;
+  translate: var(--glyph-dx, 0) var(--glyph-dy, 0);
 }
 
 body {
@@ -261,9 +258,9 @@ body::before {
 }
 .route.diamond > .routeText {
   display: table-cell;
-  /* The centering nudge rides inside the counter-rotation so it stays vertical on screen. */
-  top: 0;
-  transform: rotate(-45deg) translateY(-0.025em);
+  /* The centring offset rides inside the counter-rotation so it stays axis-aligned on screen. */
+  translate: none;
+  transform: rotate(-45deg) translate(var(--glyph-dx, 0), var(--glyph-dy, 0));
   vertical-align: middle;
   height: 4.75vw;
   width: 4.75vw;
