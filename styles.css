@@ -457,7 +457,6 @@ input, select {
   column-gap: 3vw;
   border-top: max(1px, 0.18vw) solid #777777;
   padding: 2vw 0;
-  min-height: 9vw;
   font-size: clamp(16px, 2.25vw, 48px);
   line-height: 1.3;
 }
