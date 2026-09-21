@@ -639,6 +639,7 @@ body::before {
 }
 
 .alert-warning-planned { background-image: url("icons/service-planned-work.svg"); }
+.alert-warning-stops-skipped { background-image: url("icons/service-stops-skipped.svg"); }
 .alert-warning-delay { background-image: url("icons/service-delay.svg"); }
 
 .alert-type { font-size: 1em; line-height: 1.2; margin: 0 0 0.1em; }

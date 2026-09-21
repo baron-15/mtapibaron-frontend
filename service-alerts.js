@@ -90,6 +90,9 @@
                 pages.forEach(page => {
                     const pageElement = element('div', 'alert-page');
                     page.forEach(alert => {
+                        // Mercury provides the impact separately from whether the work is planned.
+                        const type = (typeof alert.type === 'string' ? alert.type.replace(/^Planned\s*-\s*/i, '').trim() : '') ||
+                            (alert.planned ? 'Planned work' : 'Service change');
                         const card = element('article', 'service-alert');
                         const meta = element('div', 'alert-meta');
                         const badges = element('div', 'alert-badges');
@@ -98,16 +101,19 @@
                         symbols.slice(0, -1).forEach(badge => badges.appendChild(badge));
                         const anchor = element('span', 'alert-badge-anchor');
                         anchor.appendChild(symbols[symbols.length - 1]);
-                        const warning = element('span', 'alert-warning-symbol ' + (alert.planned ? 'alert-warning-planned' : 'alert-warning-delay'));
+                        const warningClass = type.toLowerCase() === 'stops skipped' ? 'alert-warning-stops-skipped' :
+                            alert.planned ? 'alert-warning-planned' : 'alert-warning-delay';
+                        const warning = element('span', 'alert-warning-symbol ' + warningClass);
                         warning.setAttribute('aria-hidden', 'true');
                         anchor.appendChild(warning);
                         badges.appendChild(anchor);
                         const summary = element('div', 'alert-summary');
-                        summary.appendChild(element('h3', 'alert-type', alert.planned ? 'Planned work' : alert.type));
+                        summary.appendChild(element('h3', 'alert-type', type));
                         const timing = element('p', 'alert-timing');
                         timing.dataset.updatedAt = alert.updatedAt || '';
                         timing.dataset.planned = String(alert.planned);
-                        timing.title = alert.schedule;
+                        timing.dataset.schedule = typeof alert.schedule === 'string' ? alert.schedule.trim() : '';
+                        timing.title = timing.dataset.schedule;
                         summary.appendChild(timing);
                         meta.appendChild(badges);
                         meta.appendChild(summary);
@@ -125,7 +131,8 @@
                 page.setAttribute('aria-hidden', String(index !== model.pageIndex));
             });
             pagesElement.querySelectorAll('.alert-timing').forEach(timing => {
-                timing.textContent = timing.dataset.planned === 'true' ? 'Happening now' : updatedLabel(Number(timing.dataset.updatedAt), model.now);
+                timing.textContent = timing.dataset.schedule || (timing.dataset.planned === 'true' ?
+                    'Happening now' : updatedLabel(Number(timing.dataset.updatedAt), model.now));
             });
             pagesElement.classList.toggle('alerts-fading', model.fading);
         };

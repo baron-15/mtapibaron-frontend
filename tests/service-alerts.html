@@ -14,7 +14,7 @@
 <div class="preview-controls">
   <span>Station response preview</span>
   <label>Alert source <select id="previewSource" onchange="setPreviewSource(this.value)">
-    <option value="sample">Sample station response</option>
+    <option value="sample">Sample station response (Sep 18–21 alerts)</option>
     <option value="live">Live local station API</option>
     <option value="empty">No alerts</option>
     <option value="error">Unavailable</option>
@@ -23,7 +23,7 @@
 </div>
 <div class="block">
   <div class="station" id="stationBlock">
-    <div id="stationName">42 St-Bryant Pk Station</div>
+    <div id="stationName">W 4 St-Wash Sq Station</div>
     <div id="allRoutes"></div>
   </div>
   <div class="train" id="trainBlock"></div>
@@ -59,14 +59,17 @@
   function sampleStationResponse() {
     const now = Date.now();
     const alerts = [
+      ['lmm:planned_work:34025', 'A', 'Planned - Part Suspended', 'No [A] between Broad Channel and Far Rockaway\n[A] will be rerouted to Rockaway Park replacing [H]\nTake [shuttle bus icon] free shuttle buses and/or rerouted [A] via [H]', 60, 'Sep 18 - 21, Fri 11:30 PM to Mon 5:00 AM'],
+      ['lmm:planned_work:34015', 'A', 'Planned - Stops Skipped', 'In Manhattan, downtown [A] local skips 116 St, 110 St, 103 St, 96 St, 86 St, 81 St and 72 St', 120, 'Sep 18 - 21, Fri to Mon, Overnight'],
       ['delay-b', 'B', 'Delays', 'Northbound [B] trains are running with delays after we moved a train with a door problem at 86 St.', 15],
       ['lmm:planned_work:f', 'F', 'Planned - Reroute', 'Queens-bound [F] trains are running via the [E] line between 47-50 Sts-Rockefeller Ctr and Jackson Hts-Roosevelt Av.', 60],
       ['lmm:planned_work:d', 'D', 'Planned - Stops Skipped', 'Uptown [D] trains skip 155 St while we replace tracks.', 120]
-    ].map(([id, route, type, text, minutes]) => ({
+    ].map(([id, route, type, text, minutes, schedule = '']) => ({
       id, routes: [route], stationWide: false, type, text, planned: id.includes('planned_work'),
-      updatedAt: now / 1000 - minutes * 60, activeUntil: null, schedule: ''
+      updatedAt: now / 1000 - minutes * 60, activeUntil: null, schedule
     }));
     const alltrains = [
+      ['A', 'Downtown', 'Far Rockaway-Mott Av', 'H11S', 2],
       ['B', 'Uptown', '145 St', 'D13N', 1],
       ['F', 'Uptown', 'Jamaica-179 St', 'F01N', 4],
       ['D', 'Downtown', 'Coney Island-Stillwell Av', 'D43S', 5],
@@ -75,7 +78,7 @@
       route, directionLabel, terminalName, terminal, time: new Date(now + minutes * 60000).toISOString()
     }));
     return { updated: new Date(now).toISOString(), data: [{
-      stationName: '42 St-Bryant Pk', stops: { D16: {} }, routes: ['B', 'D', 'F'], alltrains,
+      stationName: 'W 4 St-Wash Sq', stops: { A32: {}, D20: {} }, routes: ['A', 'B', 'D', 'F'], alltrains,
       serviceAlerts: { status: alertSource === 'error' ? 'unavailable' : 'ok', updatedAt: now / 1000 - 1800,
         expiresAt: now / 1000 + 300, alerts: ['empty', 'error'].includes(alertSource) ? [] : alerts }
     }] };
@@ -83,7 +86,7 @@
   window.fetch = async (url, options) => {
     // Exercise the actual station response path, including its alert payload.
     if (!String(url).includes('/by-id/')) return new Promise(() => {});
-    if (alertSource === 'live') return liveFetch('http://127.0.0.1:5001/by-id/D16', options);
+    if (alertSource === 'live') return liveFetch('http://127.0.0.1:5001/by-id/A32', options);
     return { ok: true, json: async () => sampleStationResponse() };
   };
 </script>
@@ -91,7 +94,7 @@
 <script src="../javascript.js"></script>
 <script>
   saveUserSettings = () => {};
-  stationId = 'D16';
+  stationId = 'A32';
   function setPreviewSource(value) {
     alertSource = value;
     loadSomeDisplay(stationId);
