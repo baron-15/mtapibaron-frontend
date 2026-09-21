@@ -172,7 +172,7 @@ test('the footer preference is saved, restored, and defaults on for older cookie
     assert.equal(element('toggleBackgroundImage').checked, true);
 });
 
-test('the station response supplies alerts without an additional fetch, and late station responses are ignored', async () => {
+test('one station response supplies labels and alerts, and late station responses are ignored', async () => {
     const vm = require('node:vm');
     const { readFileSync } = require('node:fs');
     const { join } = require('node:path');
@@ -181,27 +181,60 @@ test('the station response supplies alerts without an additional fetch, and late
         if (!elements.has(id)) elements.set(id, { style: {}, addEventListener() {}, appendChild() {} });
         return elements.get(id);
     };
-    const data = { data: [{ alltrains: [{ route: 'A', terminal: 'A02N' }], stops: { '640': {} },
-        routes: [], stationName: 'Test station', serviceAlerts: payload([alert('a')]) }] };
+    const train = { route: 'F', direction: 'N', trip: 'test-F-trip', terminal: 'F01N',
+        terminalName: 'Jamaica-179 St', time: '2026-09-20T12:00:00Z',
+        terminalPrimary: 'Uptown & Queens', terminalSecondary: 'Jamaica-179 St via Roosevelt Island' };
+    const current = { alltrains: [train], stops: { 'D20': {}, 'A32': {} },
+        routes: [], stationName: 'Test station', serviceAlerts: payload([alert('a')]) };
+    const data = { data: [current] };
     let finish;
+    let apiFailure = null;
+    let apiStatus = 200;
+    let clearedTimeouts = 0;
     const app = vm.createContext({
         console: { log() {} }, navigator: { userAgent: 'Test' }, AbortController,
-        setTimeout: () => 1, clearTimeout() {},
+        setTimeout: () => 1, clearTimeout() { clearedTimeouts++; },
         document: { cookie: '', getElementById: element, querySelector: element, querySelectorAll: () => [], createElement: element, addEventListener() {} },
         window: { addEventListener() {}, ServiceAlerts: { setContext: value => contexts.push(value) } },
         fetch: url => {
             if (!url.includes('/by-id/')) return new Promise(() => {});
             calls.push(url);
-            return new Promise(resolve => { finish = () => resolve({ ok: true, json: async () => data }); });
+            if (apiFailure) return Promise.reject(apiFailure);
+            return new Promise(resolve => { finish = () => resolve({
+                ok: apiStatus === 200, status: apiStatus, json: async () => data
+            }); });
         }
     });
     vm.runInContext(readFileSync(join(__dirname, '../javascript.js'), 'utf8'), app);
     app.renderTrainRows = app.arrivalUpdate = app.routeUpdate = app.saveUserSettings = () => {};
-    let loading = app.loadSomeDisplay('640'); finish(); await loading;
+    app.stationId = 'D20';
+    let loading = app.loadSomeDisplay('D20'); finish(); await loading;
     assert.equal(calls.length, 1);
+    assert.ok(calls[0].endsWith('/by-id/D20'));
     assert.equal(contexts.at(-1).serviceAlerts, data.data[0].serviceAlerts);
-    assert.equal(contexts.at(-1).trains[0].route, 'A');
-    loading = app.loadSomeDisplay('640');
+    assert.equal(contexts.at(-1).trains[0].route, 'F');
+    assert.equal(app.lastTrainData[0].terminalPrimary, train.terminalPrimary);
+    assert.equal(app.lastTrainData[0].terminalSecondary, train.terminalSecondary);
+
+    loading = app.loadSomeDisplay('D20');
+    app.lastTrainData = [];
     app.stationId = 'D16'; finish(); await loading;
     assert.equal(contexts.length, 1, 'Old station response must not overwrite the newly selected station');
+    assert.equal(app.lastTrainData.length, 0, 'Old station labels must not replace the current arrivals');
+
+    // Failed requests propagate to the existing retry/error display, with no second host.
+    app.stationId = 'D20';
+    apiFailure = new Error('Render unavailable');
+    await assert.rejects(app.loadSomeDisplay('D20'), /Render unavailable/);
+    assert.equal(calls.length, 3);
+    assert.ok(calls.every(url => url === 'https://mtapibaron.onrender.com/by-id/D20'));
+    assert.equal(contexts.length, 1);
+
+    apiFailure = null;
+    apiStatus = 503;
+    loading = app.loadSomeDisplay('D20'); finish();
+    await assert.rejects(loading, /Station API returned 503/);
+    assert.equal(calls.length, 4);
+    assert.equal(contexts.length, 1);
+    assert.equal(clearedTimeouts, 4, 'Every completed or failed request clears its timeout');
 });

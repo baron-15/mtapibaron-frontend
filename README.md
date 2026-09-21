@@ -17,4 +17,21 @@ When updating station membership, update the corresponding sequences in
 and retain each station once. Stops missing from the order remain selectable at
 the end of the list, alphabetically; the coverage test flags these for correction.
 
+Each arrival refresh requests only the selected station from
+`https://mtapibaron.onrender.com/by-id/<station>`. Render is the sole API host;
+failed requests use the existing retry/error display.
+
+V2 renders the backend's `terminalPrimary` and optional `terminalSecondary` as
+plain text. Borough headings show one next borough; Uptown/Downtown can still
+include a destination borough (including `Uptown & The Bronx`). The backend
+adds `via Roosevelt Island` when that station appears ahead of the current stop
+and before the terminal in the actual trip's supplied stop sequence, for any
+line and either direction. The browser does not match trips or derive these
+labels from its station CSV or stop-picker order.
+
+Deploy the `mtapibaron` backend on Render before publishing this frontend.
+Older responses without the new fields show just `terminalName`; a null or
+empty secondary field produces no subtitle. V1 and audio keep using the
+original `terminalName` and `directionLabel` fields.
+
 Run checks with `node --test tests/*.test.cjs`.

@@ -68,9 +68,7 @@ async function init() {
 
 async function loadSomeDisplay (stationId) {
     console.log("Loading display for stationID ", stationId);
-    const PRIMARY_URL = `https://mtapibaron.onrender.com/by-id/${stationId}`;
-    const BACKUP_URL = `https://mta-api-project.uc.r.appspot.com/by-id/${stationId}`;
-    //const PRIMARY_URL = `http://127.0.0.1:5000/by-id/${stationId}`;
+    const API_URL = `https://mtapibaron.onrender.com/by-id/${stationId}`;
     if ((stationId.length > 3) || (isNaN(stationId[1])) || (isNaN(stationId[2])))
     {
         console.log(stationId, 'did not pass the eye test.');
@@ -78,15 +76,13 @@ async function loadSomeDisplay (stationId) {
     }
 
     let response;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
     try {
-        const controller = new AbortController();
-        console.log('Trying primary API.');
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        response = await fetch(PRIMARY_URL, { signal: controller.signal });
+        response = await fetch(API_URL, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Station API returned ${response.status}`);
+    } finally {
         clearTimeout(timeoutId);
-    } catch (e) {
-        console.log("Primary API failed, falling back...", e.message);
-        response = await fetch(BACKUP_URL);
     }
 
     await response.json()
@@ -384,44 +380,21 @@ function updateTrainCount() {
     saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
 }
 
-function getV2DirectionLabel(train) {
-    const direction = train.directionLabel;
-    const boroughNames = { M: 'Manhattan', Bk: 'Brooklyn', Q: 'Queens' };
-    const terminalStopId = (train.terminal || '').replace(/[NS]$/, '');
-    const terminalStation = stationData.find(station => station.gtfsStopId === terminalStopId);
-    if (!terminalStation) return direction;
-
-    const terminalBorough = boroughNames[terminalStation.borough];
-
-    // Only Uptown/Downtown add a destination borough; borough labels stay singular.
-    if (noBoundDirections.includes(direction)) {
-        const currentStation = stationData.find(station => station.gtfsStopId === stationId);
-        if (currentStation && currentStation.borough === 'M') {
-            if (direction === 'Uptown' && terminalStation.borough === 'Bx') {
-                return 'Uptown & The Bronx';
-            }
-            if (terminalBorough && terminalBorough !== 'Manhattan') {
-                return direction + ' & ' + terminalBorough;
-            }
-        }
-    }
-
-    return direction;
-}
-
 function renderV2Destination(terminalDiv, train) {
-    const useDirectionLabel = noBoundDirections.includes(train.directionLabel) || boundDirections.includes(train.directionLabel);
-    const primaryText = useDirectionLabel ? getV2DirectionLabel(train) : train.terminalName;
+    // Older API responses can still supply a plain destination during rollout.
+    const hasDisplayLabels = typeof train.terminalPrimary === 'string' && train.terminalPrimary.trim() !== '';
+    const primaryText = hasDisplayLabels ? train.terminalPrimary : train.terminalName;
+    const secondaryText = hasDisplayLabels ? train.terminalSecondary : null;
 
-    let primaryDiv = document.createElement('div');
+    const primaryDiv = document.createElement('div');
     primaryDiv.className = 'terminal-primary';
     primaryDiv.textContent = primaryText;
     terminalDiv.appendChild(primaryDiv);
 
-    if (useDirectionLabel && train.terminalName) {
-        let secondaryDiv = document.createElement('div');
+    if (typeof secondaryText === 'string' && secondaryText.trim() !== '') {
+        const secondaryDiv = document.createElement('div');
         secondaryDiv.className = 'terminal-secondary';
-        secondaryDiv.textContent = train.terminalName;
+        secondaryDiv.textContent = secondaryText;
         terminalDiv.appendChild(secondaryDiv);
     }
 }

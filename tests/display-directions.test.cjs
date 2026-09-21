@@ -34,75 +34,66 @@ async function loadApp() {
     return app;
 }
 
-test('Manhattan directions add Brooklyn or Queens, and uptown adds The Bronx', async () => {
+test('v2 renders backend primary and secondary labels verbatim for any line', async () => {
     const app = await loadApp();
-    app.stationId = '127';
-    for (const directionLabel of ['Uptown', 'Downtown']) {
-        for (const [terminal, suffix] of [
-            ['R45S', ' & Brooklyn'], ['G08N', ' & Queens'],
-            ['A02N', '']
-        ]) {
-            assert.equal(app.getV2DirectionLabel({ directionLabel, terminal }), directionLabel + suffix);
-        }
-        for (const terminal of ['101N', '201N', '401N', '501N', '601N', 'D01N', '401']) {
-            const expected = directionLabel === 'Uptown' ? 'Uptown & The Bronx' : directionLabel;
-            assert.equal(app.getV2DirectionLabel({ directionLabel, terminal }), expected);
-        }
-    }
-});
-
-test('borough labels stay singular regardless of the terminal borough', async () => {
-    const app = await loadApp();
-    for (const directionLabel of ['Manhattan', 'Brooklyn', 'Queens', 'Bronx']) {
-        for (const terminal of ['R27S', 'D43S', 'G08N', '401N', undefined, 'unknownN']) {
-            assert.equal(app.getV2DirectionLabel({ directionLabel, terminal }), directionLabel);
-        }
-    }
-});
-
-test('unknown stations, missing destinations, and non-Manhattan uptown labels fall back', async () => {
-    const app = await loadApp();
-    for (const stationId of ['R31', 'R01', '414', 'unknown']) {
-        app.stationId = stationId;
-        assert.equal(app.getV2DirectionLabel({ directionLabel: 'Uptown', terminal: 'G08N' }), 'Uptown');
-        assert.equal(app.getV2DirectionLabel({ directionLabel: 'Uptown', terminal: '401N' }), 'Uptown');
-    }
-    app.stationId = '127';
-    for (const terminal of [undefined, '', 'unknownN', 'S17S']) {
-        assert.equal(app.getV2DirectionLabel({ directionLabel: 'Downtown', terminal }), 'Downtown');
-    }
-    assert.equal(app.getV2DirectionLabel({ directionLabel: 'Uptown', terminal: 'G08' }), 'Uptown & Queens');
-});
-
-test('v2 renders one borough or an expanded uptown label above the complete terminal subtitle', async () => {
-    const app = await loadApp();
-    for (const [stationId, route, directionLabel, terminal, terminalName] of [
-        ['F04', 'F', 'Manhattan', 'D43S', 'Coney Island-Stillwell Av'],
-        ['R28', 'R', 'Manhattan', 'G08N', 'Forest Hills-71 Av'],
-        ['401', '4', 'Manhattan', '250S', 'Crown Hts-Utica Av'],
-        ['A38', 'A', 'Brooklyn', 'H15S', 'Rockaway Park-Beach 116 St']
+    for (const [route, terminalPrimary, terminalSecondary] of [
+        ['F', 'Manhattan', 'Coney Island-Stillwell Av via Roosevelt Island'],
+        ['R', 'Manhattan', 'Forest Hills-71 Av'],
+        ['4', 'Manhattan', 'Crown Hts-Utica Av'],
+        ['A', 'Brooklyn', 'Rockaway Park-Beach 116 St'],
+        ['4', 'Uptown & The Bronx', 'Woodlawn'],
+        ['M', 'Uptown & Queens', 'Forest Hills-71 Av via Roosevelt Island'],
+        ['F', 'Uptown & Queens', 'Jamaica-179 St via Roosevelt Island']
     ]) {
-        app.stationId = stationId;
+        const train = { route, terminalPrimary, terminalSecondary,
+            directionLabel: 'Unused direction', terminalName: 'Raw audio destination' };
+        const original = JSON.stringify(train);
         const container = app.document.createElement('div');
-        app.renderV2Destination(container, { route, directionLabel, terminal, terminalName });
-        assert.equal(container.children[0].textContent, directionLabel, route + ' at ' + stationId);
-        assert.equal(container.children[1].textContent, terminalName);
+        app.renderV2Destination(container, train);
+        assert.equal(container.children[0].className, 'terminal-primary');
+        assert.equal(container.children[0].textContent, terminalPrimary);
+        assert.equal(container.children[1].className, 'terminal-secondary');
+        assert.equal(container.children[1].textContent, terminalSecondary);
+        assert.equal(JSON.stringify(train), original, 'Rendering must preserve raw V1/audio fields');
     }
+});
 
+test('old or incomplete API responses fall back to one plain terminal line', async () => {
+    const app = await loadApp();
     app.stationId = '127';
-    const bronx = app.document.createElement('div');
-    app.renderV2Destination(bronx, {
-        directionLabel: 'Uptown', terminal: '401N', terminalName: 'Woodlawn'
-    });
-    assert.equal(bronx.children[0].textContent, 'Uptown & The Bronx');
-    assert.equal(bronx.children[1].textContent, 'Woodlawn');
+    for (const terminalPrimary of [undefined, null, '', '  ', 5, {}]) {
+        const container = app.document.createElement('div');
+        app.renderV2Destination(container, {
+            terminalPrimary, terminalSecondary: 'Orphaned subtitle', directionLabel: 'Uptown',
+            terminal: '401N', terminalName: 'Woodlawn'
+        });
+        assert.equal(container.children[0].textContent, 'Woodlawn');
+        assert.equal(container.children.length, 1);
+    }
+});
 
-    const fallback = app.document.createElement('div');
-    app.renderV2Destination(fallback, {
-        directionLabel: 'Southbound', terminal: 'R45S', terminalName: 'Bay Ridge-95 St'
-    });
-    assert.equal(fallback.children[0].textContent, 'Bay Ridge-95 St');
-    assert.equal(fallback.children.length, 1);
+test('null, empty, or missing subtitles do not create a secondary line', async () => {
+    const app = await loadApp();
+    for (const terminalSecondary of [undefined, null, '', '  ', 5, {}]) {
+        const container = app.document.createElement('div');
+        app.renderV2Destination(container, {
+            terminalPrimary: 'Flushing-Main St', terminalSecondary,
+            terminalName: 'Flushing-Main St', directionLabel: 'Queens'
+        });
+        assert.equal(container.children[0].textContent, 'Flushing-Main St');
+        assert.equal(container.children.length, 1);
+    }
+});
+
+test('backend labels render as text rather than HTML', async () => {
+    const app = await loadApp();
+    const container = app.document.createElement('div');
+    const terminalPrimary = '<b>Uptown & Queens</b>';
+    const terminalSecondary = '<img src=x onerror=alert(1)>';
+    app.renderV2Destination(container, { terminalPrimary, terminalSecondary });
+    assert.equal(container.children[0].textContent, terminalPrimary);
+    assert.equal(container.children[1].textContent, terminalSecondary);
+    assert.ok(container.children.every(child => child.innerHTML === undefined));
 });
 
 test('announcements still use the original direction rather than the v2 combination', async () => {
@@ -112,7 +103,8 @@ test('announcements still use the original direction rather than the v2 combinat
     app.lastFetchTime = new Date('2026-09-07T12:00:00Z');
     app.lastTrainData = [{
         route: 'R', service: 'local', directionLabel: 'Uptown',
-        terminal: 'G08N', terminalName: 'Forest Hills-71 Av', time: '2026-09-07T12:05:00Z'
+        terminal: 'G08N', terminalName: 'Forest Hills-71 Av',
+        terminalPrimary: 'Uptown & Queens', terminalSecondary: 'Forest Hills-71 Av via Roosevelt Island', time: '2026-09-07T12:05:00Z'
     }];
     let playedClips;
     app.playClipSequence = async clips => { playedClips = Array.from(clips); };
