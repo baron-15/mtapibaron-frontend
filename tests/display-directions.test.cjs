@@ -34,15 +34,19 @@ async function loadApp() {
     return app;
 }
 
-test('Manhattan directions add Brooklyn or Queens but not Manhattan or Bronx', async () => {
+test('Manhattan directions add Brooklyn or Queens, and uptown adds The Bronx', async () => {
     const app = await loadApp();
     app.stationId = '127';
     for (const directionLabel of ['Uptown', 'Downtown']) {
         for (const [terminal, suffix] of [
             ['R45S', ' & Brooklyn'], ['G08N', ' & Queens'],
-            ['A02N', ''], ['401N', '']
+            ['A02N', '']
         ]) {
             assert.equal(app.getV2DirectionLabel({ directionLabel, terminal }), directionLabel + suffix);
+        }
+        for (const terminal of ['101N', '201N', '401N', '501N', '601N', 'D01N', '401']) {
+            const expected = directionLabel === 'Uptown' ? 'Uptown & The Bronx' : directionLabel;
+            assert.equal(app.getV2DirectionLabel({ directionLabel, terminal }), expected);
         }
     }
 });
@@ -62,9 +66,10 @@ test('borough labels combine with a different eligible terminal borough', async 
 
 test('unknown stations, missing destinations, and non-Manhattan uptown labels fall back', async () => {
     const app = await loadApp();
-    for (const stationId of ['R31', 'R01', 'unknown']) {
+    for (const stationId of ['R31', 'R01', '414', 'unknown']) {
         app.stationId = stationId;
         assert.equal(app.getV2DirectionLabel({ directionLabel: 'Uptown', terminal: 'G08N' }), 'Uptown');
+        assert.equal(app.getV2DirectionLabel({ directionLabel: 'Uptown', terminal: '401N' }), 'Uptown');
     }
     app.stationId = '127';
     for (const terminal of [undefined, '', 'unknownN', 'S17S']) {
@@ -82,6 +87,14 @@ test('v2 renders the combined headline with the complete terminal subtitle', asy
     });
     assert.equal(container.children[0].textContent, 'Manhattan & Brooklyn');
     assert.equal(container.children[1].textContent, 'Coney Island-Stillwell Av');
+
+    app.stationId = '127';
+    const bronx = app.document.createElement('div');
+    app.renderV2Destination(bronx, {
+        directionLabel: 'Uptown', terminal: '401N', terminalName: 'Woodlawn'
+    });
+    assert.equal(bronx.children[0].textContent, 'Uptown & The Bronx');
+    assert.equal(bronx.children[1].textContent, 'Woodlawn');
 
     const fallback = app.document.createElement('div');
     app.renderV2Destination(fallback, {

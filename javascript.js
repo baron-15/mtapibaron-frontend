@@ -389,17 +389,21 @@ function getV2DirectionLabel(train) {
     const boroughNames = { M: 'Manhattan', Bk: 'Brooklyn', Q: 'Queens' };
     const terminalStopId = (train.terminal || '').replace(/[NS]$/, '');
     const terminalStation = stationData.find(station => station.gtfsStopId === terminalStopId);
-    const terminalBorough = terminalStation && boroughNames[terminalStation.borough];
+    if (!terminalStation) return direction;
 
-    // Bronx and unknown destinations retain the existing direction label.
-    if (!terminalBorough) return direction;
+    const terminalBorough = boroughNames[terminalStation.borough];
 
     if (noBoundDirections.includes(direction)) {
         const currentStation = stationData.find(station => station.gtfsStopId === stationId);
-        if (currentStation && currentStation.borough === 'M' && terminalBorough !== 'Manhattan') {
-            return direction + ' & ' + terminalBorough;
+        if (currentStation && currentStation.borough === 'M') {
+            if (direction === 'Uptown' && terminalStation.borough === 'Bx') {
+                return 'Uptown & The Bronx';
+            }
+            if (terminalBorough && terminalBorough !== 'Manhattan') {
+                return direction + ' & ' + terminalBorough;
+            }
         }
-    } else if (Object.values(boroughNames).includes(direction) && direction !== terminalBorough) {
+    } else if (terminalBorough && Object.values(boroughNames).includes(direction) && direction !== terminalBorough) {
         return direction + ' & ' + terminalBorough;
     }
 
