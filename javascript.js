@@ -5,6 +5,7 @@ var selectedNumber = 2;
 var displayStationBlock = 0;
 var displayServiceAlerts = true;
 var displayBackgroundImage = true;
+var boardWidth = 100;
 var currentServiceAlerts = null;
 var displayVersion = 'v2';
 var stationData = [];
@@ -515,6 +516,26 @@ function toggleBackgroundImage() {
     displayBackgroundImage = document.getElementById('toggleBackgroundImage').checked;
     applyBackgroundImage(displayBackgroundImage);
     saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
+}
+
+// Board width: the share of the screen the board takes, 10-100 percent. The board is sized in container units,
+// so this scales its type and spacing too (see --board-width in styles.css).
+function updateBoardWidth() {
+    boardWidth = normalizeBoardWidth(document.getElementById('boardWidthEntry').value);
+    applyBoardWidth(boardWidth);
+    saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);
+}
+
+function normalizeBoardWidth(value) {
+    const width = parseInt(value, 10);
+    if (Number.isNaN(width)) return 100;
+    return Math.min(100, Math.max(10, width));
+}
+
+function applyBoardWidth(width) {
+    const input = document.getElementById('boardWidthEntry');
+    if (input) input.value = width;
+    if (document.documentElement) document.documentElement.style.setProperty('--board-width', width);
 }
 
 // Full screen hides the browser or PWA title bar. It needs a user gesture each time, so it is a button, not a saved setting.
@@ -1136,7 +1157,8 @@ function saveUserSettings(cS, pS, sN, sB) {
         cookieDisplayStationBlock:sB,
         cookieDisplayVersion: displayVersion,
         cookieDisplayServiceAlerts: displayServiceAlerts,
-        cookieDisplayBackgroundImage: displayBackgroundImage
+        cookieDisplayBackgroundImage: displayBackgroundImage,
+        cookieBoardWidth: boardWidth
     };
 
     var userSettingsJSON = JSON.stringify(userSettings);
@@ -1162,6 +1184,8 @@ function getUserSettings() {
         if (window.ServiceAlerts) window.ServiceAlerts.setEnabled(displayServiceAlerts);
         displayBackgroundImage = userSettings.cookieDisplayBackgroundImage !== false;
         applyBackgroundImage(displayBackgroundImage);
+        boardWidth = normalizeBoardWidth(userSettings.cookieBoardWidth);
+        applyBoardWidth(boardWidth);
         applyStationBlockDisplay(Boolean(displayStationBlock));
         editSelectedNumber.value = selectedNumber;
         document.getElementById('displayVersion').value = displayVersion;

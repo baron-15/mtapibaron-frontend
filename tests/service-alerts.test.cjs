@@ -172,6 +172,56 @@ test('the footer preference is saved, restored, and defaults on for older cookie
     assert.equal(element('toggleBackgroundImage').checked, true);
 });
 
+test('the board width preference is clamped, saved, restored, and defaults to full width for older cookies', () => {
+    const vm = require('node:vm');
+    const { readFileSync } = require('node:fs');
+    const { join } = require('node:path');
+    const source = readFileSync(join(__dirname, '../javascript.js'), 'utf8');
+    const elements = new Map();
+    const element = id => {
+        if (!elements.has(id)) elements.set(id, { style: {}, addEventListener() {}, appendChild() {} });
+        return elements.get(id);
+    };
+    const rootStyle = {};
+    const document = {
+        cookie: '', getElementById: element, querySelector: element, querySelectorAll: () => [],
+        createElement: element, addEventListener() {},
+        documentElement: { style: { setProperty(name, value) { rootStyle[name] = value; } } }
+    };
+    const app = vm.createContext({
+        console: { log() {} }, navigator: { userAgent: 'Test' }, document,
+        window: { addEventListener() {}, ServiceAlerts: { setEnabled() {} } },
+        fetch: () => new Promise(() => {}), setTimeout: () => 0, clearTimeout() {}
+    });
+    vm.runInContext(source, app);
+    const saved = () => JSON.parse(decodeURIComponent(document.cookie.split(';')[0].split('=')[1]));
+    element('boardWidthEntry').value = '60';
+    app.updateBoardWidth();
+    assert.equal(app.boardWidth, 60);
+    assert.equal(Number(rootStyle['--board-width']), 60);
+    assert.equal(saved().cookieBoardWidth, 60);
+    // Out-of-range, blank, and fractional entries are corrected in the field as well as in the setting.
+    for (const [entered, applied] of [['5', 10], ['250', 100], ['', 100], ['42.6', 42]]) {
+        element('boardWidthEntry').value = entered;
+        app.updateBoardWidth();
+        assert.equal(app.boardWidth, applied);
+        assert.equal(Number(element('boardWidthEntry').value), applied);
+        assert.equal(Number(rootStyle['--board-width']), applied);
+    }
+    const settings = saved();
+    settings.cookieBoardWidth = 35;
+    document.cookie = 'userSettings=' + encodeURIComponent(JSON.stringify(settings));
+    app.getUserSettings();
+    assert.equal(app.boardWidth, 35);
+    assert.equal(Number(rootStyle['--board-width']), 35);
+    assert.equal(Number(element('boardWidthEntry').value), 35);
+    delete settings.cookieBoardWidth;
+    document.cookie = 'userSettings=' + encodeURIComponent(JSON.stringify(settings));
+    app.getUserSettings();
+    assert.equal(app.boardWidth, 100);
+    assert.equal(Number(rootStyle['--board-width']), 100);
+});
+
 test('one station response supplies labels and alerts, and late station responses are ignored', async () => {
     const vm = require('node:vm');
     const { readFileSync } = require('node:fs');
@@ -237,4 +287,50 @@ test('one station response supplies labels and alerts, and late station response
     assert.equal(calls.length, 4);
     assert.equal(contexts.length, 1);
     assert.equal(clearedTimeouts, 4, 'Every completed or failed request clears its timeout');
+});
+
+test('newlines in alert text become line breaks between the message runs', () => {
+    // A minimal DOM: enough for the alerts view to build cards and for the test to read them back.
+    const ids = new Map();
+    const make = (tag, text = '') => {
+        let content = text;
+        const self = {
+            tag, className: '', hidden: false, title: '', dataset: {}, style: {}, children: [],
+            get textContent() { return self.children.length ? self.children.map(child => child.textContent).join('') : content; },
+            set textContent(value) { content = value; self.children.length = 0; },
+            appendChild(child) { self.children.push(child); return child; },
+            setAttribute() {},
+            classList: { add(name) { self.className += ' ' + name; }, toggle() {} },
+            querySelectorAll(selector) {
+                const found = [];
+                (function walk(node) {
+                    for (const child of node.children) {
+                        if (child.className.split(' ').includes(selector.slice(1))) found.push(child);
+                        walk(child);
+                    }
+                })(self);
+                return found;
+            }
+        };
+        return self;
+    };
+    const document = {
+        getElementById: id => ids.get(id) || ids.set(id, make('div')).get(id),
+        createElement: tag => make(tag), createTextNode: text => make('#text', text)
+    };
+    const controller = createServiceAlerts({
+        document, now: () => NOW, setTimeout: () => 1, clearTimeout() {}, reducedMotion: () => false, isHidden: () => false
+    });
+    const runs = () => document.getElementById('serviceAlertPages').querySelectorAll('.alert-message')[0].children
+        .map(child => child.tag === 'br' ? '<br>' : child.tag === 'span' ? '[' + child.textContent + ']' : child.textContent);
+    const text = 'Uptown [A] trains are running on the local track from Euclid Av to Hoyt-Schermerhorn Sts. \n' +
+        'At Nostrand Av, board uptown [A] trains on the [C] train platform.';
+    controller.setContext({ ...context, serviceAlerts: payload([alert('a', ['A'], { text })]) });
+    assert.deepEqual(runs(), ['Uptown ', '[A]', ' trains are running on the local track from Euclid Av to Hoyt-Schermerhorn Sts. ',
+        '<br>', 'At Nostrand Av, board uptown ', '[A]', ' trains on the ', '[C]', ' train platform.']);
+    // Windows line endings break the same way, and text without newlines gets no break.
+    controller.setContext({ ...context, serviceAlerts: payload([alert('b', ['A'], { text: 'No [A] service.\r\nUse [C].' })]) });
+    assert.deepEqual(runs(), ['No ', '[A]', ' service.', '<br>', 'Use ', '[C]', '.']);
+    controller.setContext({ ...context, serviceAlerts: payload([alert('c', ['A'], { text: '[A] trains are delayed.' })]) });
+    assert.deepEqual(runs(), ['', '[A]', ' trains are delayed.']);
 });

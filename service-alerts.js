@@ -69,8 +69,9 @@
             return badge;
         }
         function appendMessage(node, text) {
-            // Only known bracketed route tokens become badges. Feed HTML is never inserted.
-            for (const part of text.split(/(\[[A-Za-z0-9]+\])/g)) {
+            // Only known bracketed route tokens become badges, and each newline becomes a line break. Feed HTML is never inserted.
+            for (const part of text.split(/(\[[A-Za-z0-9]+\]|\r?\n)/g)) {
+                if (part.endsWith('\n')) { node.appendChild(document.createElement('br')); continue; }
                 const route = part.startsWith('[') && part.endsWith(']') ? normalizeRoute(part.slice(1, -1)) : '';
                 node.appendChild(route && ROUTES.has(route) ? routeBadge(route) : document.createTextNode(part));
             }

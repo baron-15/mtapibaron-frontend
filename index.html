@@ -17,122 +17,129 @@
         <meta name="theme-color" content="#000000">
     </head>
     <body onload="loadURLandSetStationId()">
-        <div class = "block">
-            <div class="station" id="stationBlock">
-                <div id="stationName"></div>
-                <div id="allRoutes"></div>
-            </div>
-            <header class="board-header" id="boardHeader" hidden>
-                <img class="board-logo" src="icons/mta-logo.svg" alt="MTA">
-                <time class="board-clock" id="boardClock"><span class="board-clock-main" id="boardClockMain"></span><span class="board-clock-seconds" id="boardClockSeconds"></span></time>
-            </header>
-            <div class="train" id="trainBlock">
-                <!--
-                <div class="trainrow">
-                    <div class="num" id="num0">1.</div>    
-                    <div class="route" id="route0">
-                        <div class="routeText" id="routeText0">.</div>
-                    </div>
-                    <div class="terminal" id="terminal0">.</div>
-                    <div class="eta" id="eta0">.</div>
+        <div class="board-frame">
+            <div class = "block">
+                <div class="station" id="stationBlock">
+                    <div id="stationName"></div>
+                    <div id="allRoutes"></div>
                 </div>
-                <div class="trainrow">
-                    <div class="num" id="num1">2.</div>    
-                    <div class="route" id="route1">
-                        <div class="routeText" id="routeText1">,</div>
-                    </div>
-                    <div class="terminal" id="terminal1">,</div>
-                    <div class="eta" id="eta1">,</div>
-                </div>
-                -->
-            </div>
-            <section class="service-alerts" id="serviceAlertsBlock" aria-labelledby="serviceAlertsTitle">
-                <header class="service-alerts-heading">
-                    <div class="service-alerts-title">
-                        <h2 id="serviceAlertsTitle">Happening now</h2>
-                        <span class="service-alerts-counter" id="serviceAlertsCounter"></span>
-                    </div>
-                    <div class="service-alerts-links">
-                        <a href="https://www.mta.info/alerts" target="_blank" rel="noopener noreferrer">Visit mta.info for more</a>
-                    </div>
+                <header class="board-header" id="boardHeader" hidden>
+                    <img class="board-logo" src="icons/mta-logo.svg" alt="MTA">
+                    <time class="board-clock" id="boardClock"><span class="board-clock-main" id="boardClockMain"></span><span class="board-clock-seconds" id="boardClockSeconds"></span></time>
                 </header>
-                <p class="service-alerts-status" id="serviceAlertsStatus" role="status">Waiting for station arrivals…</p>
-                <div class="service-alert-pages" id="serviceAlertPages"></div>
-            </section>
-            <div class = "footer">
-                <button type="button" class="footer-close" onclick="closeFooter()" aria-label="Close menu" title="Close menu">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                        <path d="m6 5 6 6 6-6M6 12l6 6 6-6" />
-                    </svg>
-                </button>
-                <div class = "forms">
-                    <span>
-                        <label>Route:</label>
-                        <select id="routeSelect">
-                            <option value="">-- Select --</option>
-                        </select>
-                    </span>
-                    <span>
-                        <label>Stop:</label>
-                        <select id="stopSelect" disabled>
-                            <option value="">-- Select --</option>
-                        </select>
-                    </span>
+                <div class="train" id="trainBlock">
+                    <!--
+                    <div class="trainrow">
+                        <div class="num" id="num0">1.</div>    
+                        <div class="route" id="route0">
+                            <div class="routeText" id="routeText0">.</div>
+                        </div>
+                        <div class="terminal" id="terminal0">.</div>
+                        <div class="eta" id="eta0">.</div>
+                    </div>
+                    <div class="trainrow">
+                        <div class="num" id="num1">2.</div>    
+                        <div class="route" id="route1">
+                            <div class="routeText" id="routeText1">,</div>
+                        </div>
+                        <div class="terminal" id="terminal1">,</div>
+                        <div class="eta" id="eta1">,</div>
+                    </div>
+                    -->
                 </div>
-                <div class = "forms">
-                    <span>
-                        <label for="selectedNumber">Select the number of trains in display:</label>
-                            <select id="noOfTrainsEntry" onchange="updateTrainCount()">
-                            <option value="1">1</option>
-                            <option value="2" selected>2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                            <option value="9">9</option>
-                        </select>
-                    </span>
-                    <span>
-                        <label for="displayVersion">Display:</label>
-                        <select id="displayVersion" onchange="updateDisplayVersion()">
-                            <option value="v1">v1</option>
-                            <option value="v2" selected>v2</option>
-                        </select>
-                    </span>
-                    <span>
-                        <label for="toggleStationBlock">Display Station Block:</label>
-                        <input type="checkbox" id="toggleStationBlock" onchange="toggleStationBlock()" checked>
-                    </span>
-                    <span>
-                        <label for="toggleServiceAlerts">Display service alerts:</label>
-                        <input type="checkbox" id="toggleServiceAlerts" onchange="toggleServiceAlerts()" checked>
-                    </span>
-                    <span>
-                        <label for="toggleBackgroundImage">Background image:</label>
-                        <input type="checkbox" id="toggleBackgroundImage" onchange="toggleBackgroundImage()" checked>
-                    </span>
-                    <span>
-                        <button type="button" id="toggleFullscreen" onclick="toggleFullscreen()" hidden>Go full screen</button>
-                    </span>
-                    <span>
-                        <label for="toggleAnnouncement">Voice Announcement:</label>
-                        <input type="checkbox" id="toggleAnnouncement" onchange="toggleAnnouncement()">
-                        <label for="announcementInterval">every</label>
-                        <input type="number" id="announcementIntervalEntry" value="300" min="30" max="1200" step="1" style="width: 50px;" onchange="updateAnnouncementInterval()">
-                        <label>s</label>
-                        <label for="announcementGapEntry">gap:</label>
-                        <input type="number" id="announcementGapEntry" value="0" min="-1000" max="1000" step="1" style="width: 55px;">
-                        <label>ms</label>
-                    </span>
-                </div>
-
-                <div class="misc" id="datetime">Time is coming</div>
+                <section class="service-alerts" id="serviceAlertsBlock" aria-labelledby="serviceAlertsTitle">
+                    <header class="service-alerts-heading">
+                        <div class="service-alerts-title">
+                            <h2 id="serviceAlertsTitle">Happening now</h2>
+                            <span class="service-alerts-counter" id="serviceAlertsCounter"></span>
+                        </div>
+                        <div class="service-alerts-links">
+                            <a href="https://www.mta.info/alerts" target="_blank" rel="noopener noreferrer">Visit mta.info for more</a>
+                        </div>
+                    </header>
+                    <p class="service-alerts-status" id="serviceAlertsStatus" role="status">Waiting for station arrivals…</p>
+                    <div class="service-alert-pages" id="serviceAlertPages"></div>
+                </section>
             </div>
-            <script src="service-alerts.js"></script>
-            <script src="route-stop-order.js"></script>
-            <script src="javascript.js"></script>
         </div>
+        <div class = "footer">
+            <button type="button" class="footer-close" onclick="closeFooter()" aria-label="Close menu" title="Close menu">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="m6 5 6 6 6-6M6 12l6 6 6-6" />
+                </svg>
+            </button>
+            <div class = "forms">
+                <span>
+                    <label>Route:</label>
+                    <select id="routeSelect">
+                        <option value="">-- Select --</option>
+                    </select>
+                </span>
+                <span>
+                    <label>Stop:</label>
+                    <select id="stopSelect" disabled>
+                        <option value="">-- Select --</option>
+                    </select>
+                </span>
+            </div>
+            <div class = "forms">
+                <span>
+                    <label for="selectedNumber">Select the number of trains in display:</label>
+                        <select id="noOfTrainsEntry" onchange="updateTrainCount()">
+                        <option value="1">1</option>
+                        <option value="2" selected>2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                    </select>
+                </span>
+                <span>
+                    <label for="displayVersion">Display:</label>
+                    <select id="displayVersion" onchange="updateDisplayVersion()">
+                        <option value="v1">v1</option>
+                        <option value="v2" selected>v2</option>
+                    </select>
+                </span>
+                <span>
+                    <label for="toggleStationBlock">Display Station Block:</label>
+                    <input type="checkbox" id="toggleStationBlock" onchange="toggleStationBlock()" checked>
+                </span>
+                <span>
+                    <label for="toggleServiceAlerts">Display service alerts:</label>
+                    <input type="checkbox" id="toggleServiceAlerts" onchange="toggleServiceAlerts()" checked>
+                </span>
+                <span>
+                    <label for="toggleBackgroundImage">Background image:</label>
+                    <input type="checkbox" id="toggleBackgroundImage" onchange="toggleBackgroundImage()" checked>
+                </span>
+                <span>
+                    <label for="boardWidthEntry">Board width:</label>
+                    <input type="number" id="boardWidthEntry" value="100" min="10" max="100" step="1" style="width: 50px;" onchange="updateBoardWidth()">
+                    <label>%</label>
+                </span>
+                <span>
+                    <button type="button" id="toggleFullscreen" onclick="toggleFullscreen()" hidden>Go full screen</button>
+                </span>
+                <span>
+                    <label for="toggleAnnouncement">Voice Announcement:</label>
+                    <input type="checkbox" id="toggleAnnouncement" onchange="toggleAnnouncement()">
+                    <label for="announcementInterval">every</label>
+                    <input type="number" id="announcementIntervalEntry" value="300" min="30" max="1200" step="1" style="width: 50px;" onchange="updateAnnouncementInterval()">
+                    <label>s</label>
+                    <label for="announcementGapEntry">gap:</label>
+                    <input type="number" id="announcementGapEntry" value="0" min="-1000" max="1000" step="1" style="width: 55px;">
+                    <label>ms</label>
+                </span>
+            </div>
+
+            <div class="misc" id="datetime">Time is coming</div>
+        </div>
+        <script src="service-alerts.js"></script>
+        <script src="route-stop-order.js"></script>
+        <script src="javascript.js"></script>
     </body>
 </html>

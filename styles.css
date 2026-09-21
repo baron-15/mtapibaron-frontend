@@ -6,6 +6,8 @@ html {
 :root {
   /* Route bullet glyph size / visible bullet diameter. Reference bullets: 'B' 0.74, '3' 0.75, '1' 0.67. */
   --route-glyph-ratio: 0.72;
+  /* "Board width" option, 10-100: the share of the screen the board frame takes. Set from the options panel. */
+  --board-width: 100;
 }
 
 /* Route bullets share one face and one optical centering everywhere they appear. */
@@ -125,16 +127,16 @@ input, select {
 
 
 #stationName {
-  font-size: 6vw;
+  font-size: 6cqw;
   font-weight: bold;
   padding-top: 0.25vh;
-  padding-left: 0.75vw;
-  padding-right: 0.75vw;
+  padding-left: 0.75cqw;
+  padding-right: 0.75cqw;
   padding-bottom: 0.75vh;
 }
 
 #stationNameAlt {
-  font-size: 3.5vw;
+  font-size: 3.5cqw;
   font-weight: normal;
   padding-top: 0.75vh;
 }
@@ -149,19 +151,19 @@ input, select {
 
 #allRoutes .route.diamond {
   /* Use the rotated diamond's visible width, rather than its square side. */
-  font-size: calc(4.7vw * 1.414214 * var(--route-glyph-ratio));
+  font-size: calc(4.7cqw * 1.414214 * var(--route-glyph-ratio));
 }
 
 #allRoutes {
-  font-size: calc(6vw * var(--route-glyph-ratio));
+  font-size: calc(6cqw * var(--route-glyph-ratio));
   line-height: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(5.75vw, 1fr));
-  grid-template-rows: 6vw;
-  gap: 1.5vw;
+  grid-template-columns: repeat(auto-fill, minmax(5.75cqw, 1fr));
+  grid-template-rows: 6cqw;
+  gap: 1.5cqw;
   padding-top: 0.5vh;
-  padding-left: 0.75vw;
-  padding-right: 0.75vw;
+  padding-left: 0.75cqw;
+  padding-right: 0.75cqw;
   padding-bottom: 1vh;
 }
 
@@ -177,18 +179,28 @@ body::before {
   min-height: 5vh;
 }
 
-.block {
+/* The board's frame: the "Board width" option sets the share of the screen it takes, and it is the size
+   container for the board, so 1cqw inside is 1% of the frame width (1vw when the frame spans the screen).
+   The board is sized in cqw throughout, so its type and spacing scale with the frame, not the window. */
+.board-frame {
   flex: none;
+  width: calc(var(--board-width) * 1%);
+  margin-left: auto;
+  margin-right: auto;
+  container-type: inline-size;
+}
+
+.block {
   background-color: black;
-  margin-left: 4vw;
-  margin-right: 4vw;
+  margin-left: 4cqw;
+  margin-right: 4cqw;
 }
 
 .station {
   display: grid;
-  row-gap: 1vw;
+  row-gap: 1cqw;
   color: white;
-  padding: 1.5vw;
+  padding: 1.5cqw;
 }
 
 /* Logo and NYC clock: stands in for the station block when that is switched off. */
@@ -198,7 +210,7 @@ body::before {
   justify-content: space-between;
   color: #ffffff;
   /* Same side padding as .train, so 1cqw here equals 1cqw in the rows. */
-  padding: 1.5vw 1.5vw 0;
+  padding: 1.5cqw 1.5cqw 0;
   container-type: inline-size;
 }
 
@@ -226,8 +238,8 @@ body::before {
     display: grid;
     row-gap: 0;
     color: white;
-    padding: 1.5vw;
-    font-size: 3.75vw;
+    padding: 1.5cqw;
+    font-size: 3.75cqw;
 }
 
 .train:has(> .trainrow.v2) {
@@ -237,28 +249,28 @@ body::before {
 
 .trainrow {
     display: grid;
-    grid-template-columns: 2.5vw 5.75vw auto 13vw;
-    grid-template-rows: 6vw;
+    grid-template-columns: 2.5cqw 5.75cqw auto 13cqw;
+    grid-template-rows: 6cqw;
     padding-top: 0.9vh;
-    padding-left: 0.75vw;
-    padding-right: 0.75vw;
+    padding-left: 0.75cqw;
+    padding-right: 0.75cqw;
     padding-bottom: 0.9vh;
     align-items: center;
-    column-gap: 1.45vw;
-    box-shadow: inset 0 -0.2vw 0 white;
+    column-gap: 1.45cqw;
+    box-shadow: inset 0 -0.2cqw 0 white;
 
     
 }
 
 .trainrow > * {
   position: relative;
-  top: -0.1vw;
+  top: -0.1cqw;
 }
 
 .trainrow.v1 {
   /* Double the two icon gaps; preserve the terminal-to-countdown gap. */
   column-gap: 0;
-  grid-template-columns: [number] 2.5vw 2.9vw [route] 5.75vw 2.9vw [terminal] auto 1.45vw [eta] 13vw;
+  grid-template-columns: [number] 2.5cqw 2.9cqw [route] 5.75cqw 2.9cqw [terminal] auto 1.45cqw [eta] 13cqw;
 }
 
 .trainrow.v1 > .num { grid-column: number; }
@@ -271,7 +283,7 @@ body::before {
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    width: 6vw;
+    width: 6cqw;
     border-radius: 50%;
     vertical-align: middle;
 }
@@ -287,8 +299,8 @@ body::before {
   
   font-weight: bold;
   text-align: center;
-  transform: translateX(0.5vw)rotate(45deg);
-  height: 4.7vw;
+  transform: translateX(0.5cqw)rotate(45deg);
+  height: 4.7cqw;
   margin: 0;
   aspect-ratio: 1 / 1;
 }
@@ -298,8 +310,8 @@ body::before {
   translate: none;
   transform: rotate(-45deg) translate(calc(var(--glyph-dx, 0em) + var(--glyph-nudge-x, 0em)), var(--glyph-dy, 0));
   vertical-align: middle;
-  height: 4.75vw;
-  width: 4.75vw;
+  height: 4.75cqw;
+  width: 4.75cqw;
 }
 
 
@@ -508,19 +520,19 @@ body::before {
 
 .service-alerts {
   color: #ffffff;
-  padding: 5vw 2.25vw 2vw;
+  padding: 5cqw 2.25cqw 2cqw;
 }
 
 .service-alerts-heading {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 2vw;
-  margin-bottom: 1.4vw;
+  gap: 2cqw;
+  margin-bottom: 1.4cqw;
 }
 
 .service-alerts-heading h2 {
-  font-size: clamp(22px, 3.35vw, 72px);
+  font-size: clamp(22px, 3.35cqw, 72px);
   line-height: 1.15;
   margin: 0;
 }
@@ -528,12 +540,12 @@ body::before {
 .service-alerts-title {
   display: flex;
   align-items: baseline;
-  gap: 1.5vw;
+  gap: 1.5cqw;
 }
 
 .service-alerts-counter,
 .service-alerts-links {
-  font-size: clamp(12px, 1.65vw, 36px);
+  font-size: clamp(12px, 1.65cqw, 36px);
   color: #aaaaaa;
 }
 
@@ -543,7 +555,7 @@ body::before {
 .service-alerts-links {
   display: flex;
   align-items: baseline;
-  gap: 1.5vw;
+  gap: 1.5cqw;
   text-align: right;
 }
 
@@ -577,10 +589,10 @@ body::before {
 .service-alert {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr);
-  column-gap: 3vw;
-  border-top: max(1px, 0.18vw) solid #777777;
-  padding: 2vw 0;
-  font-size: clamp(16px, 2.25vw, 48px);
+  column-gap: 3cqw;
+  border-top: max(1px, 0.18cqw) solid #777777;
+  padding: 2cqw 0;
+  font-size: clamp(16px, 2.25cqw, 48px);
   line-height: 1.3;
   /* Meta bullet diameter: reference is 1.86x the heading text. */
   --meta-badge: 1.84em;
@@ -589,7 +601,7 @@ body::before {
 .alert-meta {
   display: flex;
   align-items: flex-start;
-  gap: 1.1vw;
+  gap: 1.1cqw;
   min-width: 0;
 }
 
@@ -665,11 +677,11 @@ body::before {
 .alert-message .alert-route-wide { font-size: calc(1.136em * var(--route-glyph-ratio) * 0.75); }
 
 .service-alerts-status {
-  border-top: max(1px, 0.18vw) solid #777777;
-  padding-top: 1.5vw;
-  margin: 0 0 1.5vw;
+  border-top: max(1px, 0.18cqw) solid #777777;
+  padding-top: 1.5cqw;
+  margin: 0 0 1.5cqw;
   color: #cccccc;
-  font-size: clamp(14px, 1.8vw, 38px);
+  font-size: clamp(14px, 1.8cqw, 38px);
 }
 
 @media (max-width: 600px) {
@@ -717,12 +729,12 @@ body::before {
   0%, 50%, 100% {
     background-color: var(--row-background);
     color: #ffffff;
-    box-shadow: inset 0 0 0 0.2vw #ffffff;
+    box-shadow: inset 0 0 0 0.2cqw #ffffff;
   }
   25%, 75% {
     background-color: #ffffff;
     color: #111111;
-    box-shadow: inset 0 0 0 0.2vw #ffffff;
+    box-shadow: inset 0 0 0 0.2cqw #ffffff;
   }
 }
 
@@ -730,12 +742,12 @@ body::before {
   0%, 50%, 100% {
     background-color: var(--row-background);
     color: #ffffff;
-    box-shadow: inset 0 0 0 0.2vw #ffffff;
+    box-shadow: inset 0 0 0 0.2cqw #ffffff;
   }
   25%, 75% {
     background-color: #ffffff;
     color: #111111;
-    box-shadow: inset 0 0 0 0.2vw #ffffff;
+    box-shadow: inset 0 0 0 0.2cqw #ffffff;
   }
 }
 
