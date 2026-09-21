@@ -21,7 +21,16 @@ html {
      whichever font the browser actually renders, so the ink is centred in the shape on every platform. */
   position: relative;
   line-height: 1;
-  translate: var(--glyph-dx, 0) var(--glyph-dy, 0);
+  translate: calc(var(--glyph-dx, 0em) + var(--glyph-nudge-x, 0em)) var(--glyph-dy, 0);
+}
+
+/* Small optical adjustments on top of the measured centering, scaled to each badge's text size. */
+.routeText[data-glyph="1"] {
+  --glyph-nudge-x: -0.05em;
+}
+
+.routeText[data-glyph="D"] {
+  --glyph-nudge-x: 0.05em;
 }
 
 body {
@@ -287,7 +296,7 @@ body::before {
   display: table-cell;
   /* The centring offset rides inside the counter-rotation so it stays axis-aligned on screen. */
   translate: none;
-  transform: rotate(-45deg) translate(var(--glyph-dx, 0), var(--glyph-dy, 0));
+  transform: rotate(-45deg) translate(calc(var(--glyph-dx, 0em) + var(--glyph-nudge-x, 0em)), var(--glyph-dy, 0));
   vertical-align: middle;
   height: 4.75vw;
   width: 4.75vw;
