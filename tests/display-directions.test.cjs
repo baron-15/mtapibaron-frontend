@@ -51,17 +51,13 @@ test('Manhattan directions add Brooklyn or Queens, and uptown adds The Bronx', a
     }
 });
 
-test('borough labels combine with a different eligible terminal borough', async () => {
+test('borough labels stay singular regardless of the terminal borough', async () => {
     const app = await loadApp();
-    const terminals = { Manhattan: 'R27S', Brooklyn: 'D43S', Queens: 'G08N' };
-    for (const directionLabel of Object.keys(terminals)) {
-        for (const [borough, terminal] of Object.entries(terminals)) {
-            const expected = borough === directionLabel ? directionLabel : directionLabel + ' & ' + borough;
-            assert.equal(app.getV2DirectionLabel({ directionLabel, terminal }), expected);
+    for (const directionLabel of ['Manhattan', 'Brooklyn', 'Queens', 'Bronx']) {
+        for (const terminal of ['R27S', 'D43S', 'G08N', '401N', undefined, 'unknownN']) {
+            assert.equal(app.getV2DirectionLabel({ directionLabel, terminal }), directionLabel);
         }
-        assert.equal(app.getV2DirectionLabel({ directionLabel, terminal: '401N' }), directionLabel);
     }
-    assert.equal(app.getV2DirectionLabel({ directionLabel: 'Bronx', terminal: 'R27S' }), 'Bronx');
 });
 
 test('unknown stations, missing destinations, and non-Manhattan uptown labels fall back', async () => {
@@ -78,15 +74,20 @@ test('unknown stations, missing destinations, and non-Manhattan uptown labels fa
     assert.equal(app.getV2DirectionLabel({ directionLabel: 'Uptown', terminal: 'G08' }), 'Uptown & Queens');
 });
 
-test('v2 renders the combined headline with the complete terminal subtitle', async () => {
+test('v2 renders one borough or an expanded uptown label above the complete terminal subtitle', async () => {
     const app = await loadApp();
-    app.stationId = 'R01';
-    const container = app.document.createElement('div');
-    app.renderV2Destination(container, {
-        directionLabel: 'Manhattan', terminal: 'D43S', terminalName: 'Coney Island-Stillwell Av'
-    });
-    assert.equal(container.children[0].textContent, 'Manhattan & Brooklyn');
-    assert.equal(container.children[1].textContent, 'Coney Island-Stillwell Av');
+    for (const [stationId, route, directionLabel, terminal, terminalName] of [
+        ['F04', 'F', 'Manhattan', 'D43S', 'Coney Island-Stillwell Av'],
+        ['R28', 'R', 'Manhattan', 'G08N', 'Forest Hills-71 Av'],
+        ['401', '4', 'Manhattan', '250S', 'Crown Hts-Utica Av'],
+        ['A38', 'A', 'Brooklyn', 'H15S', 'Rockaway Park-Beach 116 St']
+    ]) {
+        app.stationId = stationId;
+        const container = app.document.createElement('div');
+        app.renderV2Destination(container, { route, directionLabel, terminal, terminalName });
+        assert.equal(container.children[0].textContent, directionLabel, route + ' at ' + stationId);
+        assert.equal(container.children[1].textContent, terminalName);
+    }
 
     app.stationId = '127';
     const bronx = app.document.createElement('div');

@@ -393,6 +393,7 @@ function getV2DirectionLabel(train) {
 
     const terminalBorough = boroughNames[terminalStation.borough];
 
+    // Only Uptown/Downtown add a destination borough; borough labels stay singular.
     if (noBoundDirections.includes(direction)) {
         const currentStation = stationData.find(station => station.gtfsStopId === stationId);
         if (currentStation && currentStation.borough === 'M') {
@@ -403,8 +404,6 @@ function getV2DirectionLabel(train) {
                 return direction + ' & ' + terminalBorough;
             }
         }
-    } else if (terminalBorough && Object.values(boroughNames).includes(direction) && direction !== terminalBorough) {
-        return direction + ' & ' + terminalBorough;
     }
 
     return direction;
@@ -1099,16 +1098,37 @@ function onRouteChange() {
         return;
     }
 
-    const matchingStations = stationData
+    const remainingStations = new Map(stationData
         .filter(s => s.routes.includes(selectedRoute))
-        .sort((a, b) => a.stopName.localeCompare(b.stopName));
+        .map(station => [station.gtfsStopId, station]));
 
-    matchingStations.forEach(station => {
+    function appendStation(parent, station) {
         const option = document.createElement('option');
         option.value = station.gtfsStopId;
         option.textContent = station.stopName;
-        stopSelect.appendChild(option);
+        parent.appendChild(option);
+    }
+
+    const groups = typeof routeStopOrder === 'undefined' ? [] : routeStopOrder[selectedRoute] || [];
+    groups.forEach(group => {
+        const stations = group.stops.map(id => remainingStations.get(id)).filter(Boolean);
+        if (!stations.length) return;
+
+        const parent = group.label ? document.createElement('optgroup') : stopSelect;
+        if (group.label) {
+            parent.label = group.label;
+            stopSelect.appendChild(parent);
+        }
+        stations.forEach(station => {
+            appendStation(parent, station);
+            remainingStations.delete(station.gtfsStopId);
+        });
     });
+
+    // Keep newly added stations selectable until their route order is updated.
+    Array.from(remainingStations.values())
+        .sort((a, b) => a.stopName.localeCompare(b.stopName))
+        .forEach(station => appendStation(stopSelect, station));
 
     stopSelect.disabled = false;
 }
