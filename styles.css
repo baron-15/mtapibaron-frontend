@@ -60,7 +60,34 @@ a:visited {
   bottom: 0;
   width: 100%;
   padding: 1vh 1vw;
+  padding-right: calc(2vw + 33px);
+  box-sizing: border-box;
   background-color: rgba(0,0,0,.5);
+}
+
+.footer-close {
+  position: absolute;
+  top: 1vh;
+  right: 1vw;
+  display: grid;
+  place-items: center;
+  width: 33px;
+  height: 33px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.5);
+  border-radius: 4px;
+  background-color: #000000;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.footer-close:hover {
+  background-color: #333333;
+}
+
+.footer-close:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 
 form, label {

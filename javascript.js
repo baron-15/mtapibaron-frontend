@@ -1333,6 +1333,7 @@ function timeDifference (startTime, endTime) {
 /* Dynamic footer support */
 
 let hideTimeout = null;
+let footerHoverDismissed = false;
 const footer = document.querySelector('.footer');
 const swipeThreshold = 50; // Minimum pixels for swipe-up detection
 let touchStartY = null;
@@ -1346,23 +1347,36 @@ function showFooter() {
   footer.classList.add('visible');
 }
 
-// Schedule the footer to hide after 5 seconds of inactivity.
+function hideFooter() {
+  clearTimeout(hideTimeout);
+  hideTimeout = null;
+  footer.classList.remove('visible');
+}
+
+function closeFooter() {
+  footerHoverDismissed = true;
+  touchStartY = null;
+  hideFooter();
+}
+
+// Schedule the footer to hide after 4.5 seconds of inactivity.
 function scheduleHideFooter() {
   if (hideTimeout) {
     clearTimeout(hideTimeout);
   }
-  hideTimeout = setTimeout(() => {
-    footer.classList.remove('visible');
-    hideTimeout = null;
-  }, 5000);
+  hideTimeout = setTimeout(hideFooter, 4000);
 }
 
 // Mouse events: Show footer if hovering near the bottom; otherwise, schedule a hide.
 window.addEventListener('mousemove', (e) => {
   const bottomThreshold = window.innerHeight * 0.9;
   if (e.clientY >= bottomThreshold) {
-    showFooter();
+    if (!footerHoverDismissed) {
+      showFooter();
+    }
   } else {
+    // Re-arm hover opening once the pointer leaves the bottom edge.
+    footerHoverDismissed = false;
     scheduleHideFooter();
   }
 });
