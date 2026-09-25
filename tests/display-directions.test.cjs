@@ -96,6 +96,33 @@ test('backend labels render as text rather than HTML', async () => {
     assert.ok(container.children.every(child => child.innerHTML === undefined));
 });
 
+test('only standalone JFK words in secondary labels receive the airport marker', async () => {
+    const app = await loadApp();
+    for (const secondary of ['JFK', 'Jamaica Center/JFK', 'Far Rockaway-Mott Av/JFK via Roosevelt Island',
+        'Howard Beach-JFK Airport', 'jfk', 'JFK / JFK', '<img src=x onerror=alert(1)>/JFK']) {
+        const train = { terminalPrimary: 'JFK in primary stays plain', terminalSecondary: secondary,
+            terminalName: 'Full audio destination' };
+        const original = JSON.stringify(train);
+        const container = app.document.createElement('div');
+        app.renderV2Destination(container, train);
+        const [primary, subtitle] = container.children;
+        assert.equal(primary.textContent, train.terminalPrimary);
+        assert.equal(primary.children.length, 0);
+        assert.equal(subtitle.children.map(part => part.textContent).join(''), secondary);
+        assert.equal(subtitle.children.filter(part => part.className === 'airport-destination').length,
+            secondary.match(/\bJFK\b/gi).length);
+        assert.ok(subtitle.children.every(part => part.innerHTML === undefined));
+        assert.equal(JSON.stringify(train), original, 'The icon must not change API/audio text');
+    }
+    for (const terminalSecondary of ['Forest Hills', 'JFK2', 'NOTJFK']) {
+        const container = app.document.createElement('div');
+        app.renderV2Destination(container, { terminalPrimary: 'Howard Beach-JFK Airport', terminalSecondary });
+        assert.equal(container.children[0].children.length, 0);
+        assert.equal(container.children[1].children.length, 0);
+        assert.equal(container.children[1].textContent, terminalSecondary);
+    }
+});
+
 test('announcements still use the original direction rather than the v2 combination', async () => {
     const app = await loadApp();
     app.stationId = '127';

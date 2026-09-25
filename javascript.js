@@ -395,7 +395,17 @@ function renderV2Destination(terminalDiv, train) {
     if (typeof secondaryText === 'string' && secondaryText.trim() !== '') {
         const secondaryDiv = document.createElement('div');
         secondaryDiv.className = 'terminal-secondary';
-        secondaryDiv.textContent = secondaryText;
+        if (/\bJFK\b/i.test(secondaryText)) {
+            for (const part of secondaryText.split(/(\bJFK\b)/gi)) {
+                if (!part) continue;
+                const segment = document.createElement('span');
+                segment.textContent = part;
+                if (/^JFK$/i.test(part)) segment.className = 'airport-destination';
+                secondaryDiv.appendChild(segment);
+            }
+        } else {
+            secondaryDiv.textContent = secondaryText;
+        }
         terminalDiv.appendChild(secondaryDiv);
     }
 }

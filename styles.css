@@ -443,6 +443,21 @@ body::before {
   font-weight: normal;
 }
 
+.trainrow.v2 .terminal-secondary .airport-destination {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.trainrow.v2 .terminal-secondary .airport-destination::before {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-inline-end: 0.15em;
+  vertical-align: -0.15em;
+  background: url("icons/airport-jfk.svg") center / contain no-repeat;
+}
+
 .trainrow.v2 > .eta {
   white-space: nowrap;
   align-self: stretch;
