@@ -91,9 +91,10 @@
                 pages.forEach(page => {
                     const pageElement = element('div', 'alert-page');
                     page.forEach(alert => {
-                        // Mercury provides the impact separately from whether the work is planned.
-                        const type = (typeof alert.type === 'string' ? alert.type.replace(/^Planned\s*-\s*/i, '').trim() : '') ||
+                        // Preserve MTA's full label, including the Planned prefix.
+                        const type = (typeof alert.type === 'string' ? alert.type.trim() : '') ||
                             (alert.planned ? 'Planned work' : 'Service change');
+                        const impact = type.replace(/^Planned\s*-\s*/i, '').trim().toLowerCase();
                         const card = element('article', 'service-alert');
                         const meta = element('div', 'alert-meta');
                         const badges = element('div', 'alert-badges');
@@ -102,7 +103,7 @@
                         symbols.slice(0, -1).forEach(badge => badges.appendChild(badge));
                         const anchor = element('span', 'alert-badge-anchor');
                         anchor.appendChild(symbols[symbols.length - 1]);
-                        const warningClass = type.toLowerCase() === 'stops skipped' ? 'alert-warning-stops-skipped' :
+                        const warningClass = impact === 'stops skipped' ? 'alert-warning-stops-skipped' :
                             alert.planned ? 'alert-warning-planned' : 'alert-warning-delay';
                         const warning = element('span', 'alert-warning-symbol ' + warningClass);
                         warning.setAttribute('aria-hidden', 'true');

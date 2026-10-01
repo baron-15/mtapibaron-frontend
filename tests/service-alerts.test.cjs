@@ -355,7 +355,7 @@ test('one station response supplies labels and alerts, and late station response
     assert.equal(contexts.at(-1).serviceAlerts, null);
 });
 
-test('newlines in alert text become line breaks between the message runs', () => {
+test('alert cards preserve full MTA labels, icons, schedules, and message line breaks', () => {
     // A minimal DOM: enough for the alerts view to build cards and for the test to read them back.
     const ids = new Map();
     const make = (tag, text = '') => {
@@ -399,4 +399,19 @@ test('newlines in alert text become line breaks between the message runs', () =>
     assert.deepEqual(runs(), ['No ', '[A]', ' service.', '<br>', 'Use ', '[C]', '.']);
     controller.setContext({ ...context, serviceAlerts: payload([alert('c', ['A'], { text: '[A] trains are delayed.' })]) });
     assert.deepEqual(runs(), ['', '[A]', ' trains are delayed.']);
+
+    const schedule = 'Sep 30 - Oct 1, Wed and Thu, Overnight';
+    for (const [type, planned, icon] of [
+        ['Planned - Reroute', true, 'alert-warning-planned'],
+        ['Planned - Part Suspended', true, 'alert-warning-planned'],
+        ['Planned - Stops Skipped', true, 'alert-warning-stops-skipped'],
+        ['Stops Skipped', false, 'alert-warning-stops-skipped'],
+        ['Delays', false, 'alert-warning-delay']
+    ]) {
+        controller.setContext({ ...context, serviceAlerts: payload([alert(type, ['A'], { type, planned, schedule })]) });
+        const pages = document.getElementById('serviceAlertPages');
+        assert.equal(pages.querySelectorAll('.alert-type')[0].textContent, type);
+        assert.ok(pages.querySelectorAll('.alert-warning-symbol')[0].className.split(' ').includes(icon));
+        assert.equal(pages.querySelectorAll('.alert-timing')[0].textContent, schedule);
+    }
 });
