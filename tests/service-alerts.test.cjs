@@ -332,7 +332,18 @@ test('one station response supplies labels and alerts, and late station response
     loading = app.loadSomeDisplay('A28'); finish(); await loading;
     assert.deepEqual(Array.from(contexts.at(-1).normalRoutes), ['A', 'C', 'E']);
     assert.equal(contexts.at(-1).trains.length, 0);
-    assert.equal(element('allRoutes').style.display, 'grid', 'Normal-route filter buttons stay available with no trains');
+    assert.equal(element('allRoutes').style.display, 'none', 'Normal routes do not create station-name badges with no arrivals');
+    assert.equal(element('allRoutes').children.length, 0);
+    assert.deepEqual(selectVisibleAlerts(contexts.at(-1).serviceAlerts, contexts.at(-1).trains, NOW,
+        contexts.at(-1).normalRoutes)[0].routes, ['A', 'C', 'E'], 'ACE still appears in Happening Now');
+
+    data.data[0].alltrains = [train];
+    data.data[0].routes = ['F'];
+    loading = app.loadSomeDisplay('A28'); finish(); await loading;
+    assert.equal(element('allRoutes').style.display, 'grid');
+    assert.equal(element('allRoutes').children.length, 1, 'Only the arriving F route creates a station-name badge');
+    assert.equal(element('allRoutes').children[0].children[0].innerHTML, 'F');
+    assert.deepEqual(Array.from(contexts.at(-1).normalRoutes), ['A', 'C', 'E']);
     app.toggleRouteFilter('A');
     assert.deepEqual(Array.from(contexts.at(-1).normalRoutes), ['C', 'E']);
     app.toggleRouteFilter('A');

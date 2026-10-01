@@ -169,7 +169,7 @@ async function loadSomeDisplay (stationId) {
             document.querySelector('#stationName').appendChild(altNameBlock);
         }
 
-        let rawRoutes = [...new Set([...responseJson.data[0].routes, ...currentStationNormalRoutes])];
+        let rawRoutes = responseJson.data[0].routes;
         rawRoutes = routeOrderSort(rawRoutes);
         let noOfRoutes = rawRoutes.length;
         document.getElementById("allRoutes").innerHTML = "";

@@ -24,8 +24,9 @@ failed requests use the existing retry/error display.
 Happening Now matches both upcoming trains and the backend's `normalRoutes`, so
 reroute and suspension alerts remain visible even when no trains are scheduled
 at the selected station. Normal routes come from the backend's station metadata.
-Their route buttons remain available with no arrivals, and hiding a route filters
-its alerts too. MTA active periods and backend cache expiry still apply. Publish
+Route badges under the station name use only the backend's arrival-based `routes`;
+normal routes are included only in Happening Now. Hiding a route filters its
+alerts too. MTA active periods and backend cache expiry still apply. Publish
 the backend and frontend changes together to enable this behavior.
 
 V2 renders the backend's `terminalPrimary` and optional `terminalSecondary` as
