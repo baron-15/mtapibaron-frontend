@@ -13,6 +13,7 @@ var hiddenRoutes = new Set();
 var lastTrainData = [];
 var lastFetchTime = null;
 var currentStationStops = [];
+var currentStationNormalRoutes = [];
 var trainRotationIndex = 0;
 var trainRotationContext = '';
 var trainRotationNextAt = 0;
@@ -95,6 +96,7 @@ async function loadSomeDisplay (stationId) {
         lastTrainData = responseJson.data[0].alltrains;
         currentServiceAlerts = responseJson.data[0].serviceAlerts || null;
         currentStationStops = Object.keys(responseJson.data[0].stops);
+        currentStationNormalRoutes = responseJson.data[0].normalRoutes || [];
         lastFetchTime = currentDate;
         renderTrainRows();
         /*
@@ -167,7 +169,7 @@ async function loadSomeDisplay (stationId) {
             document.querySelector('#stationName').appendChild(altNameBlock);
         }
 
-        let rawRoutes = responseJson.data[0].routes;
+        let rawRoutes = [...new Set([...responseJson.data[0].routes, ...currentStationNormalRoutes])];
         rawRoutes = routeOrderSort(rawRoutes);
         let noOfRoutes = rawRoutes.length;
         document.getElementById("allRoutes").innerHTML = "";
@@ -511,6 +513,7 @@ function updateServiceAlertsContext() {
         window.ServiceAlerts.setContext({
             stationId,
             trains: getDisplayTrains(),
+            normalRoutes: currentStationNormalRoutes.filter(route => !hiddenRoutes.has(route.charAt(0))),
             serviceAlerts: currentServiceAlerts
         });
     }
@@ -1144,6 +1147,7 @@ function onStopChange() {
     hiddenRoutes.clear();
     stationId = selectedStopId;
     currentServiceAlerts = null;
+    currentStationNormalRoutes = [];
     if (window.ServiceAlerts) window.ServiceAlerts.setContext({ stationId, trains: [], serviceAlerts: null });
     runJobOnce();
     saveUserSettings(stationId, previousStationId, selectedNumber, displayStationBlock);

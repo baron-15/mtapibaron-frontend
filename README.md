@@ -21,6 +21,13 @@ Each arrival refresh requests only the selected station from
 `https://mtapibaron.onrender.com/by-id/<station>`. Render is the sole API host;
 failed requests use the existing retry/error display.
 
+Happening Now matches both upcoming trains and the backend's `normalRoutes`, so
+reroute and suspension alerts remain visible even when no trains are scheduled
+at the selected station. Normal routes come from the backend's station metadata.
+Their route buttons remain available with no arrivals, and hiding a route filters
+its alerts too. MTA active periods and backend cache expiry still apply. Publish
+the backend and frontend changes together to enable this behavior.
+
 V2 renders the backend's `terminalPrimary` and optional `terminalSecondary` as
 plain text. Borough headings show one next borough; Uptown/Downtown can still
 include a destination borough (including `Uptown & The Bronx`). The backend

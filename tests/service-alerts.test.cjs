@@ -27,6 +27,22 @@ test('uses backend expiry rather than rejecting an older MTA publication timesta
     assert.deepEqual(selectVisibleAlerts(payload([null, {}]), context.trains, NOW), []);
 });
 
+test('normal routes retain reroute alerts with no trains and combine with diverted arrivals', () => {
+    const data = payload([alert('ace', ['A', 'C', 'E'], { type: 'Planned - Reroute', planned: true }),
+        alert('diverted', ['F']), alert('unrelated', ['B']), alert('station', [], { stationWide: true })]);
+    const normalRoutes = ['A', 'C', 'E'];
+    const selected = selectVisibleAlerts(data, [], NOW, normalRoutes);
+    assert.deepEqual(selected.map(a => a.id), ['ace', 'station']);
+    assert.deepEqual(selected[0].routes, ['A', 'C', 'E']);
+    assert.deepEqual(selectVisibleAlerts(data, [{ route: 'F' }], NOW, normalRoutes).map(a => a.id),
+        ['ace', 'diverted', 'station']);
+    assert.deepEqual(selectVisibleAlerts(data, [], NOW, ['C', 'E'])[0].routes, ['C', 'E']);
+    assert.deepEqual(selectVisibleAlerts(data, [], NOW + 300000, normalRoutes), []);
+    assert.deepEqual(selectVisibleAlerts(payload([alert('ended', ['A'], { activeUntil: NOW / 1000 })]),
+        [], NOW, normalRoutes), []);
+    assert.deepEqual(selectVisibleAlerts(payload([alert('railway', ['SIR'])]), [], NOW, ['SI'])[0].routes, ['SI']);
+});
+
 test('pairs do not duplicate the last odd item, and labels use alert update time', () => {
     assert.deepEqual(pageAlerts([1, 2, 3, 4, 5]), [[1, 2], [3, 4], [5]]);
     assert.deepEqual(pageAlerts([]), []);
@@ -82,7 +98,25 @@ test('route filtering and station changes immediately replace the relevant alert
     assert.deepEqual(f.model.alerts.map(a => a.id), ['b']);
     f.start({ stationId: 'other', trains: [], serviceAlerts: null });
     assert.deepEqual(f.model.alerts, []);
-    assert.match(f.model.status, /No upcoming trains/);
+    assert.match(f.model.status, /temporarily unavailable/);
+});
+
+test('reroute cards and statuses work without arrivals and clear on station changes', () => {
+    const f = fixture({ alerts: [alert('ace', ['A', 'C', 'E'], { type: 'Planned - Reroute', planned: true })] });
+    f.start({ stationId: 'A28', trains: [], normalRoutes: ['A', 'C', 'E'] });
+    assert.deepEqual(f.model.alerts[0].routes, ['A', 'C', 'E']);
+    assert.equal(f.model.status, '');
+    f.start({ stationId: 'A28', trains: [], normalRoutes: ['C', 'E'] });
+    assert.deepEqual(f.model.alerts[0].routes, ['C', 'E']);
+    f.start({ stationId: 'A28', trains: [], normalRoutes: [], serviceAlerts: payload([]) });
+    assert.deepEqual(f.model.alerts, []);
+    assert.match(f.model.status, /No current alerts/);
+    f.start({ stationId: 'A28', trains: [], normalRoutes: ['A'], serviceAlerts: { status: 'loading', alerts: [] } });
+    assert.match(f.model.status, /Checking/);
+    f.start({ stationId: 'A28', trains: [], normalRoutes: ['A'], serviceAlerts: null });
+    assert.match(f.model.status, /temporarily unavailable/);
+    f.start({ stationId: 'other', trains: [], serviceAlerts: null });
+    assert.deepEqual(f.model.alerts, []);
 });
 
 test('hiding the panel cancels a pending fade and resumes with current station data', () => {
@@ -228,7 +262,9 @@ test('one station response supplies labels and alerts, and late station response
     const { join } = require('node:path');
     const elements = new Map(), calls = [], contexts = [];
     const element = id => {
-        if (!elements.has(id)) elements.set(id, { style: {}, addEventListener() {}, appendChild() {} });
+        if (!elements.has(id)) elements.set(id, { style: {}, dataset: {}, children: [],
+            classList: { add() {}, remove() {} }, addEventListener() {},
+            appendChild(child) { this.children.push(child); } });
         return elements.get(id);
     };
     const train = { route: 'F', direction: 'N', trip: 'test-F-trip', terminal: 'F01N',
@@ -244,7 +280,8 @@ test('one station response supplies labels and alerts, and late station response
     const app = vm.createContext({
         console: { log() {} }, navigator: { userAgent: 'Test' }, AbortController,
         setTimeout: () => 1, clearTimeout() { clearedTimeouts++; },
-        document: { cookie: '', getElementById: element, querySelector: element, querySelectorAll: () => [], createElement: element, addEventListener() {} },
+        document: { cookie: '', getElementById: element, querySelector: element, querySelectorAll: () => [],
+            createElement: () => element('created-' + elements.size), addEventListener() {} },
         window: { addEventListener() {}, ServiceAlerts: { setContext: value => contexts.push(value) } },
         fetch: url => {
             if (!url.includes('/by-id/')) return new Promise(() => {});
@@ -287,6 +324,24 @@ test('one station response supplies labels and alerts, and late station response
     assert.equal(calls.length, 4);
     assert.equal(contexts.length, 1);
     assert.equal(clearedTimeouts, 4, 'Every completed or failed request clears its timeout');
+
+    apiStatus = 200;
+    app.stationId = 'A28';
+    data.data[0] = { alltrains: [], stops: { A28: {} }, routes: [], normalRoutes: ['A', 'C', 'E'],
+        stationName: '34 St-Penn Station', serviceAlerts: payload([alert('ace', ['A', 'C', 'E'])]) };
+    loading = app.loadSomeDisplay('A28'); finish(); await loading;
+    assert.deepEqual(Array.from(contexts.at(-1).normalRoutes), ['A', 'C', 'E']);
+    assert.equal(contexts.at(-1).trains.length, 0);
+    assert.equal(element('allRoutes').style.display, 'grid', 'Normal-route filter buttons stay available with no trains');
+    app.toggleRouteFilter('A');
+    assert.deepEqual(Array.from(contexts.at(-1).normalRoutes), ['C', 'E']);
+    app.toggleRouteFilter('A');
+    assert.deepEqual(Array.from(contexts.at(-1).normalRoutes), ['A', 'C', 'E']);
+    element('stopSelect').value = 'D16';
+    app.runJobOnce = () => {};
+    app.onStopChange();
+    assert.equal(app.currentStationNormalRoutes.length, 0, 'Changing stations clears the previous normal routes');
+    assert.equal(contexts.at(-1).serviceAlerts, null);
 });
 
 test('newlines in alert text become line breaks between the message runs', () => {

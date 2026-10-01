@@ -15,9 +15,9 @@
             Array.isArray(payload.alerts) && Number(payload.expiresAt) * 1000 > nowMs;
     }
 
-    function selectVisibleAlerts(payload, trains, nowMs) {
+    function selectVisibleAlerts(payload, trains, nowMs, normalRoutes = []) {
         if (!isUsable(payload, nowMs)) return [];
-        const routes = new Set(trains.map(train => normalizeRoute(train.route)));
+        const routes = new Set([...normalRoutes, ...trains.map(train => train.route)].map(normalizeRoute));
         if (!routes.size) return [];
         return payload.alerts.flatMap(alert => {
             if (!alert || typeof alert.text !== 'string' || !Array.isArray(alert.routes) ||
@@ -146,18 +146,17 @@
         const view = options.render || createAlertsView(options.document || root.document);
         const reducedMotion = options.reducedMotion || (() => root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
         const isHidden = options.isHidden || (() => root.document && root.document.hidden);
-        let enabled = true, context = { trains: [], serviceAlerts: null }, contextReady = false;
+        let enabled = true, context = { trains: [], normalRoutes: [], serviceAlerts: null }, contextReady = false;
         let alerts = [], signature = '', pageIndex = 0, fading = false;
         let rotationTimer = null, swapTimer = null, expiryTimer = null;
         function render() {
             const payload = context.serviceAlerts;
             let status = '';
-            if (!contextReady) status = 'Waiting for station arrivals…';
-            else if (!context.trains.length) status = 'No upcoming trains to match service alerts.';
+            if (!contextReady) status = 'Waiting for station data…';
             else if (payload && payload.status === 'loading') status = 'Checking service alerts…';
             else if (!isUsable(payload, now())) status = 'Service alerts temporarily unavailable. Check mta.info for updates.';
             else if (payload.status === 'stale') status = 'Updates delayed. Showing the latest available MTA alerts.';
-            else if (!alerts.length) status = 'No current alerts for the arriving lines.';
+            else if (!alerts.length) status = 'No current alerts for the visible lines at this station.';
             view({ enabled, alerts, pageIndex, fading, status, now: now() });
         }
         function stopRotation() {
@@ -169,7 +168,7 @@
             if (enabled && alerts.length > 2) rotationTimer = later(rotate, delay);
         }
         function updateAlerts() {
-            const next = selectVisibleAlerts(context.serviceAlerts, context.trains, now());
+            const next = selectVisibleAlerts(context.serviceAlerts, context.trains, now(), context.normalRoutes);
             const nextSignature = JSON.stringify(next);
             if (signature !== nextSignature) {
                 stopRotation();
@@ -210,7 +209,7 @@
         return {
             setContext(value) {
                 const changedStation = context.stationId !== value.stationId;
-                context = { trains: [], serviceAlerts: null, ...value };
+                context = { trains: [], normalRoutes: [], serviceAlerts: null, ...value };
                 contextReady = true;
                 if (changedStation) { stopRotation(); signature = ''; }
                 updateAlerts();
